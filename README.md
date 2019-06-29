@@ -9,8 +9,8 @@ ing LOLIN (WeMos) compatible bopards.
 More details on construction
 https://www.hackster.io/DougalPlummer/essence-of-thor-part-1-4a83a1
 
-Support for
-MCP23017 (I2C)
-PCF8574  (I2C)
-LocalCPU I/O
+<b>I/O Support for</b><br>
+MCP23017 (via I2C)<br>
+PCF8574  (via I2C)<br>
+LocalCPU I/O<br>
 
