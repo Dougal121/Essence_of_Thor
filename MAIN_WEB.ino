@@ -41,7 +41,11 @@ void SendHTTPPageFooter(){
   server.sendContent(F("<a href='/info'>Node Infomation</a><br>"));
   server.sendContent(F("<a href='/btest'>Relay Board Test</a><br>"));
   server.sendContent(F("<a href='/vsss'>view volatile memory structures</a><br>"));
-  snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
+  if ((MyIP[0]==0)&&(MyIP[1]==0)&&(MyIP[2]==0)&&(MyIP[3]==0)) {
+    snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
+  }else{
+    snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
+  }
   server.sendContent("<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>");  
   server.sendContent("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
   server.sendContent(F("</body></html>\r\n"));

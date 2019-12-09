@@ -40,11 +40,10 @@
 #define LineText     0
 #define Line        12
 
-
 //                 0x11223344
-#define MYVER 0x12345678     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+#define MYVER 0x12345679     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 
-
+const int MAX_EEPROM = 2000 ;
 //const byte SETPMODE_PIN = D8 ; 
 //const byte FLASH_BTN = D3 ;    // GPIO 0 = FLASH BUTTON 
 //const byte SCOPE_PIN = D7 ;
@@ -318,7 +317,7 @@ int i , k , j = 0;
   pinMode(14,OUTPUT);  // D5
   pinMode(15,OUTPUT);  // D8
 
-  EEPROM.begin(2000);
+  EEPROM.begin(MAX_EEPROM);
   LoadParamsFromEEPROM(true);
 
   display.init();
@@ -538,6 +537,8 @@ int i , k , j = 0;
   server.on("/info", handleInfo);
   server.on("/iolocal", ioLocalMap);
   server.on("/eeprom", DisplayEEPROM);
+  server.on("/backup", HTTP_GET , handleBackup);
+  server.on("/backup", HTTP_POST,  handleRoot, handleFileUpload);
   server.onNotFound(handleNotFound);  
   server.begin();
 //  Serial.println("HTTP server started");
@@ -633,7 +634,11 @@ bool bDirty2 = false ;
       snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
     }    
     display.drawString(64 , 53 ,  String(buff) );
-      
+    if (ghks.lProgMethod == 0 ){
+      UpdateATTG() ;                                          // update the program switching Time To Go timers
+    }else{
+      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
+    }      
     for (i = 0 ; i < MAX_VALVE ; i++ ) {              // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
       if (( evalve[i].TypeMaster & 0x80 ) != 0 ){      // This is the master valve check
         vvalve[i].lTTG = 0 ;
@@ -755,12 +760,12 @@ bool bDirty2 = false ;
     rtc_sec = second() ;
     lScanLast = lScanCtr ;
     lScanCtr = 0 ;
-    if (ghks.lProgMethod == 0 ){
-      UpdateATTG() ;                                          // update the program switching Time To Go timers
-    }else{
-      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
-    }
-    if (( evalve[i].TypeMaster & 0x100 ) != 0 ){            // wee patch if this is a fert bar valve on then the line is clear of fertiliser
+//    if (ghks.lProgMethod == 0 ){
+//      UpdateATTG() ;                                          // update the program switching Time To Go timers
+//    }else{
+//      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
+//    }
+    if (( evalve[i].TypeMaster & 0x100 ) != 0 ){               // wee patch if this is a fert bar valve on then the line is clear of fertiliser
       if ( evalve[i].bEnable && !bDirty2 && ( vvalve[i].lATTG == 0 )){   // this is active
         vvalve[i].lATTG = 2 ;
       }

@@ -68,14 +68,22 @@ int dhour , dmin ;
                 start_t = start_day_t + ( dmin * 60 ) + ( dhour * 3600 ) ;
                 for ( int j = 0 ; j < MAX_SHIFTS ; j++ ) {                                       // Scan all the shifts and set the valve if on 
                   if (( pn.sh[j].Program  ==  p ) && ( pn.sh[j].RunTime  != 0 )){                // if the shift is part of the program
-                    finish_t = start_t + ((pn.sh[p].RunTime ) * 60 ) ;            // finish in seconds is the start + minutes*60                
+                    finish_t = start_t + ((pn.sh[j].RunTime ) * 60 ) ;            // finish in seconds is the start + minutes*60                
                     if (( now_t < finish_t ) && (now_t > start_t)){               // have a hit the valve should be on
                       for ( int v = 0 ; v < MAX_VALVE ; v++ ) {                   // for each valve
                         if ( evalve[v].bEnable ){                                 // check the valve is also switched on.... 
                           if (((  pn.sh[j].ValveNo & (0x01 << v )) != 0 )  ) {    // if this valve is selected in the shift activate it
-                            vvalve[v].lATTG = (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
+                            vvalve[v].lATTG += (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
                           }
                         } 
+                      }
+                    }else{
+                      if ((now_t < start_t ) ){
+                        for ( int v = 0 ; v < MAX_VALVE ; v++ ) {                   // for each valve
+                          if (( evalve[v].bEnable ) && (vvalve[v].lATTG>0) ){                                 // check the valve is also switched on.... 
+                            vvalve[v].lATTG += pn.sh[j].RunTime ;
+                          }
+                        }
                       }
                     }  // if time check
                     start_t = finish_t ;                                          // move forward to scan through all the shifts 

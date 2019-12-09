@@ -45,9 +45,9 @@ uint8_t fbit , board ;
         if (( efert[j].DaysEnable & 0x80 ) != 0 ){             // if it is enabled then start output
           if ( vfert[j].lTTG == 0 ) {                          // ie not in cycle
             if ( efert[j].BaseFlow > 0 ){
-              vfert[j].lTTG = efert[j].OnTime * vfert[j].Flowrate / efert[j].BaseFlow ;
+              vfert[j].lTTG = ( efert[j].OnTime * vfert[j].Flowrate / efert[j].BaseFlow ) + 1 ;
             }else{
-              vfert[j].lTTG = efert[j].OnTime  ;          
+              vfert[j].lTTG = efert[j].OnTime + 1 ;          
             }
             if (( efert[j].AType & 0x10 )== 0  ) {            
               efert[j].CurrentQty -= ( efert[j].PumpRate * vfert[j].lTTG ) ;  // only do if a normal pump
@@ -76,7 +76,8 @@ uint8_t fbit , board ;
 
 
 int fertigation_sec (void) {
-int i , k , j , ot  ;
+int i , k , j ;
+float ot  ;
 uint8_t fbit , board ;
 bool bFValve = false ;
 bool bWValve = false ;
@@ -140,16 +141,19 @@ bool bWValve = false ;
             if ( efert[i].BaseFlow > 0 ){
               vfert[i].lTTG = efert[i].OffTime ; // 
             }else{
-              vfert[i].lTTG = efert[i].OffTime  ;          
+              vfert[i].lTTG = efert[i].OffTime ;          
             }
           }else{   // off so turn on maybe
             if ( vfert[i].bRun ) {  // if hasa flow etc turn on else off
               if (( efert[i].BaseFlow > 0 ) && ( vfert[i].Flowrate >= 1  )){
                 ot = efert[i].OnTime * vfert[i].Flowrate / efert[i].BaseFlow ;
               }else{
-                ot = efert[i].OnTime  ;          
+                ot = efert[i].OnTime ;          
               }
-              if ((efert[j].AType & 0x01 ) != 0){   // normal pump
+              if ( ot < 1 ){
+                ot = 1 ;       
+              }  
+              if (( efert[i].AType & 0x10 ) != 0){   // normal pump
                 efert[i].CurrentQty -= ( efert[i].PumpRate * ot ) ; // dont decrement the tank if a master pump only do if normal pump
               }else{
                 ot = 0 ; // start again for master pump and add up all the on times
@@ -163,8 +167,8 @@ bool bWValve = false ;
                     efert[j].CurrentQty -= ( efert[i].PumpRate * ot ) ;   // need to decrement the  base solenoid/tank                
                   }
                 }  
-              }
-              vfert[i].lTTG = ot  ;       
+              } 
+              vfert[i].lTTG = ot ;       
               if ( ot > 0 ) {   
                 vfert[i].bOnOff = true ;
                 ActivateOutput(board , fbit , false , 0 ) ;

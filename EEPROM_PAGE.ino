@@ -1,3 +1,5 @@
+#define DBG_OUTPUT_PORT Serial
+
 void DisplayEEPROM() {
   uint8_t i ;
   uint16_t ii ;
@@ -150,5 +152,62 @@ void DisplayEEPROM() {
   }
   server.sendContent(F("</tr></table>"));
   SendHTTPPageFooter() ;
+}
+
+
+void handleBackup(){
+  int i , j ;
+  bool bDownLoad ;
+  String message ;
+  uint32_t MyDWord ;
+  long fileSize ;
+  SerialOutParams();
+  
+  for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("down");
+    if (i != -1){  // 
+      bDownLoad = true ;
+    }  
+  }
+  if ( bDownLoad ){
+    server.sendHeader(F("Server"),F("ESP8266-on-ice"),false);
+    server.sendHeader(F("X-Powered-by"),F("Dougal-1.0"),false);
+    server.sendHeader(F("Content-Encoding"), F("gzip"));
+//    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    fileSize = MAX_EEPROM ;
+    server.setContentLength(fileSize);
+    server.send(200, "application/octet-stream", "");
+    for (int address = 0; address < ( MAX_EEPROM - 4 ) ; address+=4 ) {
+       EEPROM.get(address, MyDWord );
+       server.sendContent(MyDWord);
+    }     
+//    server.sendContent(F("\r\n")); 
+  }else{
+  }
+}
+
+void handleFileUpload() {
+/*  if (server.uri() != "/edit") {
+    return;
+  }*/
+  HTTPUpload& upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {  // don't care not saving the file
+/*    if (SD.exists((char *)upload.filename.c_str())) {
+      SD.remove((char *)upload.filename.c_str());
+    }
+    uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE); */
+    DBG_OUTPUT_PORT.print("Upload: START, filename: "); DBG_OUTPUT_PORT.println(upload.filename);
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+//    if (uploadFile) {
+      // ok this is it we need to seek trough the data here
+      ///uploadFile.write(upload.buf, upload.currentSize);
+//    }
+    DBG_OUTPUT_PORT.print("Upload: WRITE, Bytes: "); DBG_OUTPUT_PORT.println(upload.currentSize);
+  } else if (upload.status == UPLOAD_FILE_END) {  // again dont care as not writting the file
+/*    if (uploadFile) {
+      uploadFile.close();
+    }*/
+    DBG_OUTPUT_PORT.print("Upload: END, Size: "); DBG_OUTPUT_PORT.println(upload.totalSize);
+  }
 }
 
