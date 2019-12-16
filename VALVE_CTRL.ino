@@ -59,7 +59,7 @@ int dhour , dmin ;
    if (( year() > 2018 ) && ( now() > ghks.AutoOff_t )){  // dont do this if the time is like ... BULLSHIT -- Don't switch on if time is crap (allow manual mode only)
      for ( int p = 0 ; p < MAX_PROGRAM_HEADER ; p++ ) {                                        // ie 0...8
         for ( int i = 0 ; i < MAX_STARTS ; i++ ) {                                             // for each start 0..4
-          if (pn.ph[p].StartTime[i] >= 0 ) {
+          if ( pn.ph[p].StartTime[i] >= 0 ) {
             dhour = pn.ph[p].StartTime[i] / 100 ;                                                // MAX_STARTS
             dmin = pn.ph[p].StartTime[i] % 100 ;
             for ( int d = 0 ; d < 7 ; d++ ) {                                                    // on each prgram check each day
@@ -73,26 +73,26 @@ int dhour , dmin ;
                       for ( int v = 0 ; v < MAX_VALVE ; v++ ) {                   // for each valve
                         if ( evalve[v].bEnable ){                                 // check the valve is also switched on.... 
                           if (((  pn.sh[j].ValveNo & (0x01 << v )) != 0 )  ) {    // if this valve is selected in the shift activate it
-                            vvalve[v].lATTG += (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
+                            vvalve[v].lATTG = (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
                           }
                         } 
                       }
                     }else{
-                      if ((now_t < start_t ) ){
+/*                      if ((now_t < start_t ) ){
                         for ( int v = 0 ; v < MAX_VALVE ; v++ ) {                   // for each valve
-                          if (( evalve[v].bEnable ) && (vvalve[v].lATTG>0) ){                                 // check the valve is also switched on.... 
+                          if (( evalve[v].bEnable ) && (vvalve[v].lATTG>0)){        // check the valve is also switched on.... 
                             vvalve[v].lATTG += pn.sh[j].RunTime ;
                           }
                         }
-                      }
-                    }  // if time check
+                      }  */
+                    }                                                             // if time check
                     start_t = finish_t ;                                          // move forward to scan through all the shifts 
                   }        
-                } // maxshifts for loop
+                }                                                                 // maxshifts for loop
               }
             }
           }          
-        }
+        }     // for each start
      }
    }
 }

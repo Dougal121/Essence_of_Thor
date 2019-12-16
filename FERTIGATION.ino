@@ -185,3 +185,27 @@ bool bWValve = false ;
   return(k) ;
 }
 
+//  This will return the number of writes it does or will do --- pass in if you want it to actally save
+int SaveCurrentQty(bool bWrite){
+int i ;
+int j = 0 ;
+int k ;
+float tmpFloat ;
+  for ( i = 0 ; i < MAX_FERT ; i++){
+    k = efertAddress + ( i * sizeof(fertigation_t))  + 2 ;
+    EEPROM.get(k,tmpFloat) ;
+    if ( efert[i].CurrentQty != tmpFloat ){
+      j++ ;
+ //     Serial.println("mem " + String(efert[i].CurrentQty) + " e2 " + String(tmpFloat));
+      if (bWrite) {
+        EEPROM.put(k,efert[i].CurrentQty) ;
+      }
+    }
+  }
+  if ((bWrite) && ( j > 0 )) {
+    EEPROM.commit(); 
+  }
+  return(j);
+}
+
+

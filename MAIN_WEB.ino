@@ -288,6 +288,7 @@ void handleRoot() {
       if (i != -1){  // on valve control number
         evalve[ii].FeedbackBoardBit = ( evalve[ii].FeedbackBoardBit & 0xF0 ) | ( 0x0F & String(server.arg(j)).toInt())  ;
         evalve[ii].Fertigate = 0 ;  // reset these at same time as on page 2 bet to the left
+        evalve[ii].Filter = 0 ;
 //        Serial.println("FeedbackBoardBit" + String(evalve[ii].FeedbackBoardBit) );  
       }        
       i = String(server.argName(j)).indexOf("vdes" + MyNum);
@@ -331,7 +332,7 @@ void handleRoot() {
         }
       }                
       
-      i = String(server.argName(j)).indexOf("vnum" + MyNum);
+      i = String(server.argName(j)).indexOf("vnum" + MyNum);    // not used ??? done at   "fvbt"
       if (i != -1){  // this is a cheat that allows check box resets
         if (!bExtraValve){
           evalve[ii].bEnable = false ;
@@ -341,6 +342,20 @@ void handleRoot() {
           evalve[ii].Filter = 0 ;
         }
       }        
+      for ( kk = 0 ; kk < 8 ; kk++ ) {  // fertigation and prolly filters
+        i = String(server.argName(j)).indexOf("v" + MyNum + "fg"+String(kk));
+        if (i != -1){  //  
+          if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
+            evalve[ii].Fertigate |= ( 0x1 << kk )  ;
+          }
+        }
+        i = String(server.argName(j)).indexOf("v" + MyNum + "fs"+String(kk));
+        if (i != -1){  //  
+          if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
+            evalve[ii].Filter |= ( 0x1 << kk )  ;
+          }
+        }
+      }
       i = String(server.argName(j)).indexOf("vben" + MyNum);
       if (i != -1){  // enable for automatic ie programs - does not effect manual
         if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
@@ -427,25 +442,13 @@ void handleRoot() {
           lTmp = constrain(lTmp,0,10800);
           vp[ii].p[k].runtime = lTmp ; 
         }        
-        for ( kk = 0 ; kk < 8 ; kk++ ) {  // fertigation and prolly filters
+        for ( kk = 0 ; kk < 8 ; kk++ ) {  // day of week and maste enable
           i = String(server.argName(j)).indexOf("v" + MyNum + "dw"+String(k)+"day"+String(kk));
           if (i != -1){  // 
             if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
               vp[ii].p[k].wdays |= ( 0x1 << kk )  ;
             }
           }                
-          i = String(server.argName(j)).indexOf("v" + MyNum + "fg"+String(kk));
-          if (i != -1){  //  
-            if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
-              evalve[ii].Fertigate |= ( 0x1 << kk )  ;
-            }
-          }
-          i = String(server.argName(j)).indexOf("v" + MyNum + "fl"+String(kk));
-          if (i != -1){  //  
-            if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
-              evalve[ii].Filter |= ( 0x1 << kk )  ;
-            }
-          }
         }
       }
     }
@@ -1087,10 +1090,18 @@ void handleRoot() {
       if ( MyNum.length() == 1 ) {
         MyNum = "0" + MyNum ;
       }        
-      if (vvalve[i].lTTG!=0 or vvalve[i].lATTG!=0) {
-        MyColor = F("bgcolor=green") ;
+      if ( vvalve[i].bOnOff ) {
+        if (( vvalve[i].lTTG!=0 ) || ( vvalve[i].lATTG!=0 )) {
+          MyColor = F("bgcolor=green") ;
+        }else{
+          MyColor = F("bgcolor=yellow") ;                  
+        }
       }else{
-        MyColor = F("bgcolor=red") ;
+        if (( vvalve[i].lTTG==0 ) && ( vvalve[i].lATTG==0 )) {
+          MyColor = F("bgcolor=red") ;
+        }else{
+          MyColor = F("bgcolor=orange") ;          
+        }
       }
       message += "<tr><td align=center "+String(MyColor)+">"+String(i+1) ;        // actual rows of table
       if (( bExtraValve) && (iPage == 1 )) {
@@ -1155,7 +1166,7 @@ void handleRoot() {
             }else{
               MyCheck = "" ;      
             }
-            message += "<td align=center"+String(MyColor)+"><input type='checkbox' name='v"+MyNum+"fl"+ String(k)+"' "+String(MyCheck)+ "></td>";    
+            message += "<td align=center"+String(MyColor)+"><input type='checkbox' name='v"+MyNum+"fs"+ String(k)+"' "+String(MyCheck)+ "></td>";    
           }          
         }
       }

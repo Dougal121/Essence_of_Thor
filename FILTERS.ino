@@ -1,15 +1,15 @@
 int filter_scan (void){
 int i ,k ;
-  for ( i = 0 ; i < MAX_FILTER ; i++){
-    if ( efilter[i].Enable != 0 ) {
-      vfilter[i].bOnOff = 0 ;   //reset them all
+  for ( k = 0 ; k < MAX_FILTER ; k++){
+    if ( efilter[k].Enable != 0 ) {
+      vfilter[k].bOnOff = false ;   //reset them all
     }
   }
   for ( i = 0 ; i < MAX_VALVE ; i++ ) {             // for each valve work out which turn filter units on
     if (( evalve[i].Filter != 0 )&&( vvalve[i].bOnOff == true )){
       for ( k = 0 ; k < 8  ; k++ ) {                // for each valve work out which turn filter units on
         if (( evalve[i].Filter & ( 0x01 << k )) != 0 ){
-          vfilter[i].bOnOff = true ;  // set them on if they need be active
+          vfilter[k].bOnOff = true ;  // set them on if they need be active
         }
       }
     }
