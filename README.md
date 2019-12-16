@@ -14,3 +14,4 @@ MCP23017 (via I2C)<br>
 PCF8574  (via I2C)<br>
 LocalCPU I/O<br>
 
+2019-2020 Irrigation season progressing well 5 major bugs exorsised so far
