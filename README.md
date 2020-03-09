@@ -15,3 +15,5 @@ PCF8574  (via I2C)<br>
 LocalCPU I/O<br>
 
 2019-2020 Irrigation season progressing well 5 major bugs exorsised so far
+
+09/03/2020 Uploaded stuff from Jan 2020 - Static IP address and Backup/Restore program memory
