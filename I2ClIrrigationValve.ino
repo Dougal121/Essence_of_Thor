@@ -450,9 +450,6 @@ int i , k , j = 0;
   Serial.print("Soft AP IP address: ");
   snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
   Serial.println(buff);
-//  sprintf(ghks.nssid,"Farm130PumpSite\0");
-//  sprintf(ghks.npassword,"85799D21B0\0");
-
   
   bConfig = false ;   // are we in factory configuratin mode
   display.display();
