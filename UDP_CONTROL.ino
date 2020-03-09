@@ -9,7 +9,8 @@ byte packetBuffer[ 10+(MAX_VALVE*6)];           //buffer to hold outgoing packet
   packetBuffer[2] = 0xff;  // 
   packetBuffer[3] = 0xff;  // 
   
-/*  packetBuffer[4]  = highByte(word((lNodeAddress & 0xffff0000)>>16)) ;   // from this station node
+/*     
+  packetBuffer[4]  = highByte(word((lNodeAddress & 0xffff0000)>>16)) ;   // from this station node
   packetBuffer[5]  = lowByte(word((lNodeAddress & 0xffff0000)>>16)) ;
   packetBuffer[6]  = highByte(word(lNodeAddress & 0xffff)) ;
   packetBuffer[7]  = lowByte(word(lNodeAddress & 0xffff)) ;

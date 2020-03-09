@@ -1,10 +1,10 @@
 /*
-    This project is a distillation of "Project Thor"  ( which started in 2008 )
+    This project is a distillation of "Project Thor"  which started in 2008
     So in that vein you can expect it's lost a little body but the conceptual "active constituents" are present in a concerntrated form.
 
     The code is designed to work with/in multiple configurations and hardware based around the ESP8266.
 
-    It was fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
+    It was originally fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
     Newer copies can be found at https://github.com/Dougal121/Essence_of_Thor
 
     The idea is to provide low cost high tech fertigation/irrigation control for real world farming which is scalable from small to medium size farms (0.1 to 100 Ha)
@@ -62,8 +62,8 @@ const int  MAX_MINUTES = 10080 ; // maximum minutes in a 7 day cycle
 const byte MAX_BOARDS = 16 ;
 const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a system
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
-//SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
+SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
+//SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
 
 
 /*
@@ -205,10 +205,17 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char nssid[16] ;                        // 62  
   char npassword[16] ;                    // 78
   time_t AutoOff_t ;                      // 82     auto off until time > this date   
-  long lDisplayOptions  ;                 // 86 
+  uint8_t lDisplayOptions  ;              // 83 
+  uint8_t lNetworkOptions  ;              // 84 
+  uint8_t lSpare1  ;                      // 85 
+  uint8_t lSpare2  ;                      // 86 
   char timeServer[24] ;                   // 110   = {"au.pool.ntp.org\0"}
   char cpassword[16] ;                    // 126
   long lVersion  ;                        // 130
+  IPAddress IPStatic ;                    // (192,168,0,123)   
+  IPAddress IPGateway ;                   // (192,168,0,1)    
+  IPAddress IPMask ;                      // (255,255,255,0)   
+  IPAddress IPDNS ;                       // (192,168,0,15)   
 } general_housekeeping_stuff_t ;          // computer says it's 136 not 130 ??? is my maths crap ????
 
 general_housekeeping_stuff_t ghks ;
@@ -248,9 +255,10 @@ int iTestTimer = 0 ;
 int iTestInc = 1 ; 
 int iTestCoil = 0 ;
 int bSaveReq = 0 ;
-
+int iUploadPos = 0 ;
 bool bDoTimeUpdate = false ;
-
+long  MyCheckSum ;
+long  MyTestSum ;
 long lTimePrev ;
 long lTimePrev2 ;
 
@@ -448,6 +456,9 @@ int i , k , j = 0;
   
   bConfig = false ;   // are we in factory configuratin mode
   display.display();
+  if ( ghks.lNetworkOptions != 0 ) {
+    WiFi.config(ghks.IPStatic,ghks.IPGateway,ghks.IPMask,ghks.IPDNS ); 
+  }
   if ( ghks.npassword[0] == 0 ){
     WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point      
   }else{
@@ -538,7 +549,8 @@ int i , k , j = 0;
   server.on("/iolocal", ioLocalMap);
   server.on("/eeprom", DisplayEEPROM);
   server.on("/backup", HTTP_GET , handleBackup);
-  server.on("/backup", HTTP_POST,  handleRoot, handleFileUpload);
+  server.on("/backup.txt", HTTP_GET , handleBackup);
+  server.on("/backup.txt", HTTP_POST,  handleRoot, handleFileUpload);
   server.onNotFound(handleNotFound);  
   server.begin();
 //  Serial.println("HTTP server started");
@@ -628,11 +640,17 @@ bool bDirty2 = false ;
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    if (( rtc_sec & 0x02 ) == 0  ){  // altinate the ip addresses ( setup AP and client to AP )
-      snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
-    }else{
-      snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
-    }    
+    switch (rtc_sec & 0x03){
+      case 1:
+        snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
+      break;
+      case 2:
+        snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
+      break;
+      default:
+        snprintf(buff, BUFF_MAX, "%s", cssid );            
+      break;
+    }
     display.drawString(64 , 53 ,  String(buff) );
     if (ghks.lProgMethod == 0 ){
       UpdateATTG() ;                                          // update the program switching Time To Go timers

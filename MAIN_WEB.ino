@@ -48,6 +48,7 @@ void SendHTTPPageFooter(){
   }
   server.sendContent("<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>");  
   server.sendContent("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
+  server.sendContent("<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br>");  
   server.sendContent(F("</body></html>\r\n"));
 }
 
@@ -496,6 +497,11 @@ void handleRoot() {
       ghks.lDisplayOptions = String(server.arg(j)).toInt() ;
       ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
     }  
+    i = String(server.argName(j)).indexOf("netop");
+    if (i != -1){  // 
+      ghks.lNetworkOptions = String(server.arg(j)).toInt() ;
+      ghks.lNetworkOptions = constrain(ghks.lNetworkOptions,0,255);
+    }
     i = String(server.argName(j)).indexOf("maxvn");
     if (i != -1){  // 
       ghks.lMaxDisplayValve = String(server.arg(j)).toInt() ;
@@ -536,6 +542,34 @@ void handleRoot() {
       ghks.RCIP[1] =String(server.arg(j)).substring(4,7).toInt() ;
       ghks.RCIP[2] = String(server.arg(j)).substring(8,11).toInt() ;
       ghks.RCIP[3] =String(server.arg(j)).substring(12,15).toInt() ;
+    }
+    i = String(server.argName(j)).indexOf("staip");
+    if (i != -1){  // have a request to request an IP address
+      ghks.IPStatic[0] = String(server.arg(j)).substring(0,3).toInt() ;
+      ghks.IPStatic[1] =String(server.arg(j)).substring(4,7).toInt() ;
+      ghks.IPStatic[2] = String(server.arg(j)).substring(8,11).toInt() ;
+      ghks.IPStatic[3] =String(server.arg(j)).substring(12,15).toInt() ;
+    }
+    i = String(server.argName(j)).indexOf("gatip");
+    if (i != -1){  // have a request to request an IP address
+      ghks.IPGateway[0] = String(server.arg(j)).substring(0,3).toInt() ;
+      ghks.IPGateway[1] =String(server.arg(j)).substring(4,7).toInt() ;
+      ghks.IPGateway[2] = String(server.arg(j)).substring(8,11).toInt() ;
+      ghks.IPGateway[3] =String(server.arg(j)).substring(12,15).toInt() ;
+    }
+    i = String(server.argName(j)).indexOf("mskip");
+    if (i != -1){  // have a request to request an IP address
+      ghks.IPMask[0] = String(server.arg(j)).substring(0,3).toInt() ;
+      ghks.IPMask[1] =String(server.arg(j)).substring(4,7).toInt() ;
+      ghks.IPMask[2] = String(server.arg(j)).substring(8,11).toInt() ;
+      ghks.IPMask[3] =String(server.arg(j)).substring(12,15).toInt() ;
+    }
+    i = String(server.argName(j)).indexOf("dnsip");
+    if (i != -1){  // have a request to request an IP address
+      ghks.IPDNS[0] = String(server.arg(j)).substring(0,3).toInt() ;
+      ghks.IPDNS[1] =String(server.arg(j)).substring(4,7).toInt() ;
+      ghks.IPDNS[2] = String(server.arg(j)).substring(8,11).toInt() ;
+      ghks.IPDNS[3] =String(server.arg(j)).substring(12,15).toInt() ;
     }
     
     i = String(server.argName(j)).indexOf("atoff");
@@ -747,8 +781,35 @@ void handleRoot() {
  
     snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.RCIP[0],ghks.RCIP[1],ghks.RCIP[2],ghks.RCIP[3]);
     server.sendContent(F("<tr><td>Remote IP Address Control</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
+    server.sendContent("<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr></form>");
+    
+    server.sendContent("<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>") ; 
+
+    server.sendContent(F("<tr><td>Network Options</td><td align=center>")) ; 
+    server.sendContent(F("<select name='netop'>")) ;
+    if (ghks.lNetworkOptions == 0 ){
+      server.sendContent(F("<option value='0' SELECTED>0 - DHCP")); 
+      server.sendContent(F("<option value='1'>1 - Static")); 
+    }else{
+      server.sendContent(F("<option value='0'>0 - DHCP")); 
+      server.sendContent(F("<option value='1' SELECTED>1 - Static IP")); 
+    }
+    server.sendContent(F("</select></td><td><input type='submit' value='SET'></td></tr>"));
+    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPStatic[0],ghks.IPStatic[1],ghks.IPStatic[2],ghks.IPStatic[3]);
+    server.sendContent(F("<tr><td>Static IP Address</td><td align=center>")) ; 
+    server.sendContent("<input type='text' name='staip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
+
+    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPGateway[0],ghks.IPGateway[1],ghks.IPGateway[2],ghks.IPGateway[3]);
+    server.sendContent(F("<tr><td>Gateway IP Address</td><td align=center>")) ; 
+    server.sendContent("<input type='text' name='gatip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
   
+    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPMask[0],ghks.IPMask[1],ghks.IPMask[2],ghks.IPMask[3]);
+    server.sendContent(F("<tr><td>IP Mask</td><td align=center>")) ; 
+    server.sendContent("<input type='text' name='mskip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
+
+    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPDNS[0],ghks.IPDNS[1],ghks.IPDNS[2],ghks.IPDNS[3]);
+    server.sendContent(F("<tr><td>DNS IP Address</td><td align=center>")) ; 
+    server.sendContent("<input type='text' name='dnsip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
 
     server.sendContent("<tr><td>Last Scan Speed</td><td align=center>" + String(lScanLast) + "</td><td>(per second)</td></tr>" ) ;    
     if( hasRTC ){

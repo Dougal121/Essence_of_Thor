@@ -211,7 +211,7 @@ void handleProgramNew(){
   }
   server.sendContent( F("</table></form><br>"));   // End of combo with program header
     
-  message = "<br><form method=get action=" + server.uri() + ">" ;
+  message = "<br><form method=post action=" + server.uri() + ">" ;
   message += F("Program Filter: <select name='prgm'>") ;
   message += "<option value='-1'>ALL" ;
   for ( j = 0 ; j < MAX_PROGRAM_HEADER ; j++ ){
