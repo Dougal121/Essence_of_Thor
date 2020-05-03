@@ -1,10 +1,9 @@
 # Essence of Thor
-Open Source Irrigation Controller Circa 2019
+Open Source Irrigation Controller Circa 2019<br>
 
-This code is designed for the ESP platform
-First versions running on the ESP8266 
-Compiled pn the arduino IDE and traget
-ing LOLIN (WeMos) ESP8266/ESP32 compatible bopards.
+This code is designed for the ESP platform<br>
+First versions running on the ESP8266 <br>
+Compiled in the arduino IDE and trageting LOLIN (WeMos) ESP8266/ESP32 compatible bopards.<br>
 
 More details on construction
 https://www.hackster.io/DougalPlummer/essence-of-thor-part-1-4a83a1
