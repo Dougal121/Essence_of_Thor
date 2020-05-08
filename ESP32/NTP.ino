@@ -42,7 +42,7 @@ IPAddress ntpIP ;
     if  (( ntpIP[0] == 0 ) &&  ( ntpIP[1] == 0 ) && ( ntpIP[2] == 0 ) && ( ntpIP[3] == 0 )){
       Serial.println("No DNS - no point 0.0.0.0 ");      
     }else{  
-      ntpudp.beginPacket(buff, 123); //NTP requests are to port 123
+      ntpudp.beginPacket(buff, 123);                         //NTP requests are to port 123
       ntpudp.write(packetBuffer, NTP_PACKET_SIZE);
       ntpudp.endPacket();
       Serial.println("Sent NTP packet to "+String(address)+ "  ->  "+String(buff));      

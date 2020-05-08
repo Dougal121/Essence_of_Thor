@@ -13,7 +13,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
-#include <ESPmDNS.h>
+//#include <ESPmDNS.h>
 #include <WiFiUDP.h> 
 #include <Update.h>
 #include <TimeLib.h>
@@ -260,9 +260,12 @@ int iUploadPos = 0 ;
 long  MyCheckSum ;
 long  MyTestSum ;
 bool bDoTimeUpdate = false ;
+unsigned long lTimeNext = 0 ;     // next network retry
+bool bPrevConnectionStatus = false;
 
 long lTimePrev ;
 long lTimePrev2 ;
+long lMinUpTime = 0 ;
 
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
@@ -505,39 +508,39 @@ int i , k , j = 0;
   if (ghks.localPortCtrl == ghks.localPort ){             // bump the NTP port up if they ar the same
     ghks.localPort++ ;
   }
-//    Serial.println("Starting UDP");
+    Serial.println("Starting UDP");
     ntpudp.begin(ghks.localPort);                      // this is the recieve on NTP port
     display.drawString(0, 44, "NTP UDP " );
     display.display();
-//    Serial.print("NTP Local UDP port: ");
+    Serial.println("NTP Local UDP port: ");
 //    Serial.println(ntpudp.localPort());
     ctrludp.begin(ghks.localPortCtrl);                 // recieve on the control port
     display.drawString(64, 44, "CTRL UDP " );
     display.display();
-//    Serial.print("Control Local UDP port: ");
+    Serial.println("Control Local UDP port: ");
 //    Serial.println(ctrludp.localPort());
                                                 // end of the normal setup
  
-  sprintf(host,"Control_%08X\0",chipid);
-  if (MDNS.begin(host)) {
-    MDNS.addService("http", "tcp", 80);
+//  sprintf(host,"Control_%08X\0",chipid);
+//  if (MDNS.begin(host)) {
+//    MDNS.addService("http", "tcp", 80);
 //    Serial.println("MDNS responder started");
 //    Serial.print("You can now connect to http://");
 //    Serial.print(host);
 //    Serial.println(".local");
-  }
+//  }
 
   server.on("/", handleRoot);
-  server.on("/setup", handleRoot);
-  server.on("/filt", handleRoot);
-  server.on("/fert", handleRoot);
-  server.on("/vsss", handleRoot);
+  server.on("/setup", handleSetup);
+  server.on("/filt", handleFilt);
+  server.on("/fert", handleFert);
+  server.on("/vsss", handleVSSS);
   server.on("/prog", handleRoot);
   server.on("/prognew", handleProgramNew);
   server.on("/scan", i2cScan);
   server.on("/iosc", ioScan);
-  server.on("/stime", handleRoot);
-  server.on("/btest", handleRoot);
+  server.on("/stime", handleSTime);
+  server.on("/btest", handleBTest);
   server.on("/info", handleInfo);
   server.on("/iolocal", ioLocalMap);
   server.on("/eeprom", DisplayEEPROM);
@@ -580,7 +583,7 @@ int i , k , j = 0;
   
   server.onNotFound(handleNotFound);  
   server.begin();
-//  Serial.println("HTTP server started");
+  Serial.println("HTTP server started");
  
 //  dnsServer.setTTL(300);
 //  dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
@@ -619,6 +622,7 @@ uint8_t OffPulse ;
 bool bSendCtrlPacket = false ;
 bool bDirty = false ;
 bool bDirty2 = false ;
+long lTD ;
 
   server.handleClient();
 
@@ -821,6 +825,7 @@ bool bDirty2 = false ;
     rtc_hour = hour();
   }
   if ( rtc_min != minute()){
+    lMinUpTime++ ;
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( vvalve[i].lATTG > 0 ){
         vvalve[i].lATTG -- ;
@@ -870,6 +875,39 @@ bool bDirty2 = false ;
   filter_scan();
   filter_sec();
 //  dnsServer.processNextRequest();
+  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
+  if ( !bPrevConnectionStatus && WiFi.isConnected() ){
+      Serial.println(String(buff )+ " WiFi Reconnected OK...");  
+  }
+  if (!WiFi.isConnected())  {
+    lTD = (long)lTimeNext-(long) millis() ;
+    if (( abs(lTD)>40000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
+      lTimeNext = millis() - 1 ;
+/*      Serial.print(millis());
+      Serial.print(" ");
+      Serial.print(lTimeNext);
+      Serial.print(" ");
+      Serial.println(abs(lTD));*/
+    }
+    bPrevConnectionStatus = false;
+    if ( lTimeNext < millis() ){
+      Serial.println(String(buff )+ " Trying to reconnect WiFi ");
+      WiFi.disconnect(false);
+//      Serial.println("Connecting to WiFi...");
+      WiFi.mode(WIFI_AP_STA);
+      if ( ghks.lNetworkOptions != 0 ) {            // use ixed IP
+        WiFi.config(ghks.IPStatic, ghks.IPGateway, ghks.IPMask, ghks.IPDNS );
+      }
+      if ( ghks.npassword[0] == 0 ) {
+        WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point
+      } else {
+        WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
+      }
+      lTimeNext = millis() + 30000 ;
+    }
+  }else{
+    bPrevConnectionStatus = true ;
+  }  
 
 }   //  ################### BOTTOM OF LOOP ########################
 
