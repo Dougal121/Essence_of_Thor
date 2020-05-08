@@ -261,6 +261,7 @@ long  MyCheckSum ;
 long  MyTestSum ;
 long lTimePrev ;
 long lTimePrev2 ;
+long lMinUpTime = 0 ;
 
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
@@ -750,6 +751,7 @@ bool bDirty2 = false ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );           // Pulse On          
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
+          delay(ghks.lPulseTime % 128 ); 
         }        
       }
       if ((vvalve[i].lTTG <= 0 )&&(vvalve[i].lATTG <= 0 )&&(vvalve[i].bOnOff)){
@@ -762,6 +764,7 @@ bool bDirty2 = false ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , OffPulse ) ;
+          delay(ghks.lPulseTime % 128 ); 
         }
       }
       if ( vvalve[i].bNetOnOff != vvalve[i].bOnOff ){
@@ -802,6 +805,7 @@ bool bDirty2 = false ;
     rtc_hour = hour();
   }
   if ( rtc_min != minute()){
+    lMinUpTime++ ;
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( vvalve[i].lATTG > 0 ){
         vvalve[i].lATTG -- ;
