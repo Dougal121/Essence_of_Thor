@@ -240,7 +240,7 @@ void handleBackup(){
 }
 
 void handleFileUpload() {
-int i , j ;
+int i , j , ii ;
 uint8_t  MyByte ; 
 String message ;
 String value ;
@@ -277,10 +277,11 @@ bool bULC = false ;
       DBG_OUTPUT_PORT.print("TestSum:"); 
       DBG_OUTPUT_PORT.println(String(MyTestSum,HEX));
       j = 4 ;
+      ii = 0  ;
+      message = "" ; 
     }else{
       j = 0 ;
     }
-    
     
     for ( i = j ; ( i < upload.currentSize ) && ( i < HTTP_UPLOAD_BUFLEN ) ; i += 2 ){
       vc[0] = upload.buf[i] ;
@@ -288,18 +289,22 @@ bool bULC = false ;
       vc[2] = 0 ;
       value = String(vc) ;  
       MyByte = byte( strtoul(vc,NULL,16));
-//      EEPROM.put(iUploadPos++, MyByte );
-      MyCheckSum += MyByte ;
-      MyCheckSum &= 0xffff ;
-/*       if ( MyByte < 16 ){
-          message += "0" + String(MyByte,HEX) ;
-       }else{
-          message += String(MyByte,HEX) ;        
-       }
-       if ((( i+2) % 16 ) == 0 ) {
-          DBG_OUTPUT_PORT.println(message);
-          message = "" ; 
-       }  */
+      if ((upload.buf[i] != '\r') && (upload.buf[i+1] != '\n')) {
+        EEPROM.put(iUploadPos, MyByte );
+        iUploadPos++ ;
+        MyCheckSum += MyByte ;
+        MyCheckSum &= 0xffff ;
+        if ( MyByte < 16 ){
+            message += "0" + String(MyByte,HEX) ;
+         }else{
+            message += String(MyByte,HEX) ;        
+         }
+         if ((( ii) % 32 ) == 31 ) {
+//            DBG_OUTPUT_PORT.println(message);
+            message = "" ; 
+         }  
+        ii++;
+      }
     }
 //    DBG_OUTPUT_PORT.print("Upload: WRITE, Bytes: "); DBG_OUTPUT_PORT.println(upload.currentSize);
   } else if (upload.status == UPLOAD_FILE_END) {  // again dont care as not writting the file

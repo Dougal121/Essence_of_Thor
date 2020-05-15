@@ -62,8 +62,8 @@ const int  MAX_MINUTES = 10080 ; // maximum minutes in a 7 day cycle
 const byte MAX_BOARDS = 16 ;
 const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a system
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
-SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-//SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
+//SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
+SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
 
 
 /*
@@ -247,6 +247,8 @@ int  efertAddress ;
 long lRebootCode = 0 ;
 uint8_t rtc_status ;
 struct ts tc;  
+bool bPrevConnectionStatus = false;
+unsigned long lTimeNext = 0 ;           // next network retry
 
 int iTestBoard = 0 ;
 int iTestMode = -1 ; 
@@ -592,7 +594,8 @@ uint8_t OffPulse ;
 bool bSendCtrlPacket = false ;
 bool bDirty = false ;
 bool bDirty2 = false ;
-
+long lTD ;
+  
   server.handleClient();
   OTAWebServer.handleClient();
 
@@ -855,6 +858,41 @@ bool bDirty2 = false ;
   filter_scan();
   filter_sec();
 //  dnsServer.processNextRequest();
+
+
+
+
+  if (!WiFi.isConnected())  {
+    lTD = (long)lTimeNext-(long) millis() ;
+    if (( abs(lTD)>40000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
+      lTimeNext = millis() - 1 ;
+/*      Serial.print(millis());
+      Serial.print(" ");
+      Serial.print(lTimeNext);
+      Serial.print(" ");
+      Serial.println(abs(lTD));*/
+    }
+    bPrevConnectionStatus = false;
+    if ( lTimeNext < millis() ){
+      Serial.println(String(buff )+ " Trying to reconnect WiFi ");
+      WiFi.disconnect(false);
+//      Serial.println("Connecting to WiFi...");
+      WiFi.mode(WIFI_AP_STA);
+      if ( ghks.lNetworkOptions != 0 ) {            // use ixed IP
+        WiFi.config(ghks.IPStatic, ghks.IPGateway, ghks.IPMask, ghks.IPDNS );
+      }
+      if ( ghks.npassword[0] == 0 ) {
+        WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point
+      } else {
+        WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
+      }
+      lTimeNext = millis() + 30000 ;
+    }
+  }else{
+    bPrevConnectionStatus = true ;
+  }  
+
+
 
 }   //  ################### BOTTOM OF LOOP ########################
 
