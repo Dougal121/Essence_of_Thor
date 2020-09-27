@@ -13,7 +13,7 @@ void BackInTheBoxMemory(){
     }
   }  
   for (i = 0 ; i < MAX_PROGRAM_HEADER  ; i++ ) {   // Clear all these
-    sprintf(pn.ph[i].Description , "Prog %2d\0" ,i ) ;
+    sprintf(pn.ph[i].Description , "Prog %2d\0" ,(i+1) ) ;
     pn.ph[i].WDays = 0 ;
     for (j = 0 ; j < MAX_STARTS  ; j++ ) {   // NEW PROGRAMMING    ------   Clear all these
       if (( j == 0 ) && ( i == 0 )) {
@@ -61,6 +61,7 @@ void BackInTheBoxMemory(){
       evalve[i].OnCoilBoardBit = 0x10 + ((i-8) * 2 ) ;
       evalve[i].OffCoilBoardBit = 0x10 + ((i-8) * 2 + 1 ) ;                
     }
+    evalve[i].OnOffPolPulse = 0x11 ; // 20ms
     evalve[i].Fertigate = 0 ;
     evalve[i].bEnable = true ;
     evalve[i].Flowrate = 1.0 ;
@@ -138,9 +139,8 @@ void BackInTheBoxMemory(){
   }
   sprintf(ghks.nssid,"************\0");  // put your default credentials in here if you wish
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
-  
-
   sprintf(ghks.NodeName,"Prickle Patch\0") ;
+  
 
   sprintf(ghks.cpassword,"\0");
   
@@ -151,13 +151,14 @@ void BackInTheBoxMemory(){
   sprintf(ghks.timeServer ,"au.pool.ntp.org\0"); 
   ghks.AutoOff_t = 0 ;
   ghks.localPortCtrl = 8088 ;
-  ghks.RemotePortCtrl= 8089 ;
+  ghks.RemotePortCtrl= 8088 ;
   ghks.lVersion = MYVER ;
   
-  ghks.RCIP[0] = 192 ;
+/*  ghks.RCIP[0] = 192 ;
   ghks.RCIP[1] = 168 ; 
   ghks.RCIP[2] = 2 ;
-  ghks.RCIP[3] = 255 ;
+  ghks.RCIP[3] = 255 ;*/
+  sprintf(ghks.RCIP ,"192.168.2.255\0"); 
   
   ghks.lNetworkOptions = 0 ;     // DHCP 
   ghks.IPStatic[0] = 192 ;
