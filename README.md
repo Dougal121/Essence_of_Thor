@@ -13,7 +13,7 @@ MCP23017 (via I2C)<br>
 PCF8574  (via I2C)<br>
 LocalCPU I/O<br>
 
-2019-2020 Irrigation season progressing well 5 major bugs exorsised so far<br>
+2019-2020 Irrigation season progressing well 7 major bugs exorsised so far<br>
 <br>
 09/03/2020 Uploaded stuff from Jan 2020 - Static IP address and Backup/Restore program memory<br>
 03/05/2020 Load in fixes for connection and UDP without DNS lookups.<br>
