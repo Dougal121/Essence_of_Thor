@@ -1,70 +1,90 @@
-unsigned long sendCTRLpacket(IPAddress address){
+unsigned long sendCTRLpacket(){
 int j ;  
-byte packetBuffer[ 10+(MAX_VALVE*6)];           //buffer to hold outgoing packets  
-//  Serial.println("sending CTRL packet...");
-                    
-  memset(packetBuffer, 0, 10+(MAX_VALVE*6));    // set all bytes in the buffer to 0
-  packetBuffer[0] = 0xff;                       // broadcast as all stations
-  packetBuffer[1] = 0xff;  // 
-  packetBuffer[2] = 0xff;  // 
-  packetBuffer[3] = 0xff;  // 
-  
-/*     
-  packetBuffer[4]  = highByte(word((lNodeAddress & 0xffff0000)>>16)) ;   // from this station node
-  packetBuffer[5]  = lowByte(word((lNodeAddress & 0xffff0000)>>16)) ;
-  packetBuffer[6]  = highByte(word(lNodeAddress & 0xffff)) ;
-  packetBuffer[7]  = lowByte(word(lNodeAddress & 0xffff)) ;
-*/  
-  packetBuffer[8]  = 52;   // command
-  packetBuffer[9]  = MAX_VALVE;    //  valves to follow
+int ii ;
+IPAddress ctrlIP ;
+cnc_t  cnc ;  
 
-  for ( int i  = 0 ;  i < MAX_VALVE ; i++ ){
-    j = i * 6 ;
-    packetBuffer[10+j] = highByte(vvalve[i].lTTG) ;
-    packetBuffer[11+j] = lowByte(vvalve[i].lTTG) ;
-    packetBuffer[12+j] = highByte(vvalve[i].lATTG) ;
-    packetBuffer[13+j] = lowByte(vvalve[i].lATTG) ;
-    packetBuffer[14+j] = evalve[i].Node ;
-    packetBuffer[15+j] = evalve[i].Valve ;
+  Serial.println("CTRL packet called...");
+  if (WiFi.isConnected())  {
+
+    Serial.println("WiFi Available...");
+                      
+    memset(packetBuffer, 0, sizeof(packetBuffer));    // set all bytes in the buffer to 0
+    cnc.cmd = 42 ;
+    cnc.snode = 0 ;
+    ii = 0 ;
+    for ( int i  = 0 ;  i < MAX_VALVE ; i++ ){
+      if (( evalve[i].Node != ghks.lNodeAddress ) && ( evalve[i].Node != 0 ) && (( evalve[i].Valve & 0x80 ) == 0x00 )) {           // && ( evalve[i].Valve != 0 )
+        cnc.cv[ii].lTTG = vvalve[i].lTTG ;
+        cnc.cv[ii].lATTG = vvalve[i].lATTG ;
+        cnc.cv[ii].lTTC = vvalve[i].lTTC ;
+        cnc.cv[ii].Fertigate = evalve[i].Fertigate ;
+        cnc.cv[ii].Flowrate = evalve[i].Flowrate ;
+        cnc.cv[ii].Node = evalve[i].Node ;
+        cnc.cv[ii].ValveNo = ( evalve[i].Valve -1 ) & 0x7f ;                               // top bit it indicate this recieves data
+        ii++ ;                                                                             // increment for next time
+      }
+    }
+    cnc.valves = ii ;
+    if ( ii > 0 ){                                                                         // there are valves to be uplinked
+//      WiFi.hostByName(address, ghks.RCIP );
+      snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ghks.RCIP[0], ghks.RCIP[1], ghks.RCIP[2], ghks.RCIP[3]);
+      Serial.print("IP address: "+String(ghks.RemotePortCtrl)+" ->  ");
+      Serial.println(buff);
+      if  (( ghks.RCIP[0] == 0 ) &&  ( ghks.RCIP[1] == 0 ) && ( ghks.RCIP[2] == 0 ) && ( ghks.RCIP[3] == 0 )){
+        Serial.println("No DNS - no point sending NTP to 0.0.0.0 ");      
+      }else{
+        ctrludp.beginPacket( buff, ghks.RemotePortCtrl);                                 // Send control data to the remote port - Broadcast ???
+        ctrludp.write((byte *)&cnc, sizeof(cnc));
+        ctrludp.endPacket();
+        Serial.println("sending CTRL packet...");
+      }
+    }
   }
-
-  ctrludp.beginPacket(address, ghks.RemotePortCtrl);      // Send control data to the remote port - Broadcast ???
-  ctrludp.write(packetBuffer, 10+(MAX_VALVE*6));
-  ctrludp.endPacket();
+  else{
+    Serial.println("No WiFi ???");
+  }
 }
 
 
 unsigned long processCtrlUDPpacket(long lSize){
 int i , j ;  
-unsigned long highWord ;
-unsigned long lowWord ;
-unsigned long lAddress ;
-byte packetBuffer[10+(MAX_VALVE*6)];           //buffer to hold incomming packets  
+int ii ;
+byte packetBuffer[16];
+cnc_t  cnc ;  
 
-//  Serial.println(F("Process Ctrl Packet "));
-  memset(packetBuffer, 0, 10+(MAX_VALVE*6));
-  ctrludp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
-  highWord = word(packetBuffer[0], packetBuffer[1]);
-  lowWord = word(packetBuffer[2], packetBuffer[3]);
-  lAddress = highWord << 16 | lowWord;
+  Serial.println("Process Uplinked data...");      
+  memset(&cnc, 0, sizeof(cnc));
+  ctrludp.read((byte *)&cnc, sizeof(cnc)); // read the packet into the buffer
 
-  if (( ghks.lNodeAddress == lAddress) || ( lAddress == 0xffffffff )){ // is our address or a braodcast
-      switch(packetBuffer[8] ){ // command byte
-        case 52:
-          j = packetBuffer[9] ; // number of valves to be read
-          for (i = 0 ; i < MAX_VALVE && ( i < j ) ; i++ ){
-            if (( packetBuffer[14+(i*6)] == ghks.lNodeAddress ) && ( packetBuffer[15+(i*6)] == i )){
-              lowWord = word(packetBuffer[10+(i*6)], packetBuffer[11+(i*6)]);  // recieve all the ttgs for the valves
-              vvalve[i].lTTG = lowWord ;
-              highWord = word(packetBuffer[12+(i*6)], packetBuffer[13+(i*6)]);  // recieve all the ttgs for the valves
-              vvalve[i].lATTG = highWord ;
-            }
+  switch(cnc.cmd ){ // command byte
+    case 42:
+      j = MAX_VALVE ;
+      if ( j > cnc.valves ) 
+        j = cnc.valves ;
+      Serial.println("Command 42...");      
+      for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
+        ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
+        Serial.println("Valve " + String(ii) + " Uplink status " + String(evalve[ii].Valve));      
+        if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
+          if ( ghks.lNodeAddress == cnc.cv[i].Node ){
+            if ( evalve[ii].bEnable ){
+              vvalve[ii].lATTG = cnc.cv[i].lATTG ;
+            } 
+            vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
+            vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
+            evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
+            evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
+            Serial.println("Uplinked data accepted Valve No " + String(ii));      
           }
-        break;
+        }
       }
+      break;
   }
+
   while (ctrludp.available()){  // clean out the rest of the packet and dump overboard
     ctrludp.read(packetBuffer, sizeof(packetBuffer));  
   }
+  
 }
 

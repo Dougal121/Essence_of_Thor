@@ -10,6 +10,7 @@ unsigned long processNTPpacket(void){
     setTime((time_t)epoch);                                                             // update the clock
     Serial.print(F("Unix time = "));
     Serial.println(epoch);                                                              // print Unix time:
+    rtc_hour = hour() ;                                                                 // stop this happining again now it's updated
 }
 
 unsigned long sendNTPpacket(char* address){

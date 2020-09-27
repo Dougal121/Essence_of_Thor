@@ -23,7 +23,9 @@ int dhour , dmin ;
 
    now_t = now() ;
    for ( int i = 0 ; i < MAX_VALVE ; i++ ) {       // for each valve
-     vvalve[i].lATTG = 0 ;                         // set to zero -- i.e switch off
+     if (((evalve[i].Valve & 0x80) == 0) || ( !evalve[i].bEnable )) {   // if enabled and uplink then dont reset
+      vvalve[i].lATTG = 0 ;                         // set to zero -- i.e switch off
+     }
      if (( year() > 2000 ) && ( now() > ghks.AutoOff_t )){                     // dont do this if time is like ... BULLSHIT --switch off if time is crap (allow manual mode only
         for ( int p = 0 ; p < MAX_PROGRAM ; p++ ) {
           dhour = vp[i].p[p].starttime / 100 ;
@@ -34,8 +36,10 @@ int dhour , dmin ;
               start_t = start_day_t + ( dmin * 60 ) + ( dhour * 3600 ) ;
               finish_t = start_t + ((vp[i].p[p].runtime ) * 60 ) ;        // finish in seconds is the start + minutes*60
               if (( now_t < finish_t ) && (now_t > start_t)){             // have a hit the valve should be on
-                if ( evalve[i].bEnable ){                                 // check the valve is also switched on.... 
-                  vvalve[i].lATTG = (finish_t - now_t + 58) / 60 ;        // display the time in minutes - the 58 is so we dont miss the last minute
+                if (( evalve[i].bEnable )&&(( evalve[i].Valve & 0x80 ) == 0 )){                                 // check the valve is also switched on.... 
+                  if ((evalve[i].Valve & 0x80) == 0){                       // must be not be in rx/uplink mode  
+                    vvalve[i].lATTG = (finish_t - now_t + 58) / 60 ;        // display the time in minutes - the 58 is so we dont miss the last minute
+                  }
                 }
               }
             }
@@ -54,7 +58,9 @@ int dhour , dmin ;
 
    now_t = now() ;
    for ( int i = 0 ; i < MAX_VALVE ; i++ ) {                                                 // for each valve
-     vvalve[i].lATTG = 0 ;                                                                   // set to zero -- i.e switch off
+    if (((evalve[i].Valve & 0x80) == 0) || ( !evalve[i].bEnable )){
+      vvalve[i].lATTG = 0 ;                                                                   // set to zero -- i.e switch off
+    }
    } 
    if (( year() > 2018 ) && ( now() > ghks.AutoOff_t )){  // dont do this if the time is like ... BULLSHIT -- Don't switch on if time is crap (allow manual mode only)
      for ( int p = 0 ; p < MAX_PROGRAM_HEADER ; p++ ) {                                        // ie 0...8
@@ -71,9 +77,11 @@ int dhour , dmin ;
                     finish_t = start_t + ((pn.sh[j].RunTime ) * 60 ) ;            // finish in seconds is the start + minutes*60                
                     if (( now_t < finish_t ) && (now_t > start_t)){               // have a hit the valve should be on
                       for ( int v = 0 ; v < MAX_VALVE ; v++ ) {                   // for each valve
-                        if ( evalve[v].bEnable ){                                 // check the valve is also switched on.... 
+                        if (( evalve[v].bEnable )&&(( evalve[v].Valve & 0x80 ) == 0 )){                                 // check the valve is also switched on.... 
                           if (((  pn.sh[j].ValveNo & (0x01 << v )) != 0 )  ) {    // if this valve is selected in the shift activate it
-                            vvalve[v].lATTG = (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
+                            if ((evalve[v].Valve & 0x80) == 0){                       // must be not be in rx/uplink mode  
+                              vvalve[v].lATTG = (finish_t - now_t + 58) / 60 ;      // display the time in minutes - the 58 is so we dont miss the last minute
+                            }
                           }
                         } 
                       }

@@ -24,7 +24,7 @@ void SendHTTPHeader(){
   server.sendContent(F("<!DOCTYPE HTML>"));
   server.sendContent("<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>");
   server.sendContent(F("<meta name=viewport content='width=320, auto inital-scale=1'>"));
-  server.sendContent(F("</head><body><html><center><h3>"));   
+  server.sendContent(F("</head><body><html lang='en'><center><h3>"));   
   server.sendContent("<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a></h3>");
 }
 
@@ -41,7 +41,7 @@ void SendHTTPPageFooter(){
   server.sendContent(F("<a href='/info'>Node Infomation</a><br>"));
   server.sendContent(F("<a href='/btest'>Relay Board Test</a><br>"));
   server.sendContent(F("<a href='/vsss'>view volatile memory structures</a><br>"));
-  if ((MyIP[0]==0)&&(MyIP[1]==0)&&(MyIP[2]==0)&&(MyIP[3]==0)) {
+  if (!WiFi.isConnected()) {
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
   }else{
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
@@ -139,6 +139,10 @@ void handleRoot() {
         break;
         case 667: // wipe the memory to factory default
           BackInTheBoxMemory();
+        break;
+        case 69: // wipe the memory to factory default
+          BackInTheBoxMemory();
+          LoadParamsFromEEPROM(false);
         break;
         case 665:
           sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour  
@@ -411,11 +415,18 @@ void handleRoot() {
         evalve[ii].Node =  String(server.arg(j)).toInt() ;
 //        Serial.println("Remote Node Address" + String(evalve[ii].Node) );  
       }        
+      
       i = String(server.argName(j)).indexOf("ncom" + MyNum);
       if (i != -1){  // Valve Control Node
-        evalve[ii].Valve =  String(server.arg(j)).toInt() ;
-//        Serial.println("Remote Valve Address" + String(evalve[ii].Valve) );  
-      }        
+        evalve[ii].Valve =  String(server.arg(j)).toInt() & 0x7f ;
+      }     
+      i = String(server.argName(j)).indexOf("ncul" + MyNum);
+      if (i != -1){  // Valve Control Node
+         if ( String(server.arg(j)).length() == 2 ){ // this relies on the one above coming first which it usu
+            evalve[ii].Valve += 0x80  ;
+         }
+      }     
+         
       i = String(server.argName(j)).indexOf("vsea" + MyNum);
       if (i != -1){  
         if ( String(server.arg(j)).toInt() == 0 ){
@@ -722,7 +733,7 @@ void handleRoot() {
     server.sendContent("<tr><td "+String(MyColor)+">Auto Off Until</td><td align=center>") ; 
     server.sendContent("<input type='text' name='atoff' value='"+ String(buff) + "' size=12></td><td>(yyyy/mm/dd)</td></tr>");
   
-    server.sendContent(F("<tr><td>Activation Pulse</td><td align=center>")) ; 
+    server.sendContent(F("<tr><td>Activation Pulse Spacing</td><td align=center>")) ; 
     server.sendContent("<input type='text' name='ptime' value='" + String(ghks.lPulseTime) + "' size=12></td><td>(ms)</td></tr>");
   
     server.sendContent(F("<tr><td>Node Address</td><td align=center>")) ; 
@@ -1129,8 +1140,8 @@ void handleRoot() {
     if (bExtraValve) {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
-        message += F("<th colspan=4>Control Options</th><th colspan=2>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
-        message += F("<tr><th>Cascade</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
+        message += F("<th colspan=4>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
+        message += F("<tr><th>Cascade</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
         message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;
@@ -1201,7 +1212,13 @@ void handleRoot() {
           }
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='3'><input type='hidden' name='vnum"+MyNum+"' value='"+String(i)+"'><td><input type='text' name='vdes"+MyNum+"' value='" + String(evalve[i].description) + "' maxlength=7 size=8></td>" ; 
           message += "<td><input type='text' name='vmas"+MyNum+"' value='" + String((evalve[i].TypeMaster & 0x3f )) + "' maxlength=2 size=2></td><td><input type='checkbox' name='vtyd"+MyNum+"'"+ String(MyCheck2) + "></td><td><input type='checkbox' name='vtym"+MyNum+"'"+ String(MyCheck) + "></td><td><input type='checkbox' name='vtyf"+MyNum+"'"+ String(MyColor) + "></td>" ;
-          message += "<td><input type='text' name='ncom"+MyNum+"' value='" + String(evalve[i].Valve) + "' maxlength=3 size=2></td>";
+          message += "<td><input type='text' name='ncom"+MyNum+"' value='" + String(evalve[i].Valve & 0x7f) + "' maxlength=3 size=2></td>";
+          if (( evalve[i].Valve & 0xf0 ) != 0 ){
+            MyColor = F(" CHECKED") ;
+          }else{
+            MyColor = "" ;       
+          }
+          message += "<td><input type='checkbox' name='ncul"+MyNum+"'"+ String(MyColor) + "></td>";
           message += "<td><input type='text' name='ncon"+MyNum+"' value='" + String(evalve[i].Node) + "' maxlength=3 size=2></td>";
           message += "<td><input type='text' name='nflo"+MyNum+"' value='" + String(evalve[i].Flowrate) + "' maxlength=5 size=2></td>";
           message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;

@@ -14,7 +14,7 @@ uint8_t fbit , board ;
   k = dayOfWeek(now()) ;
   for ( i = 0 ; i < MAX_VALVE ; i++ ) {                                                                  // for each valve work what fertigation units are on
     if (( vvalve[i].lATTG > 1 ) || ( vvalve[i].lTTG > 1 ) || ((( evalve[i].TypeMaster & 0x40 ) != 0 ) && ( vvalve[i].iFB != 0 ))  ) {  // cut out one minute short
-       if ( evalve[i].Fertigate != 0 ){                                                                  // check if switched on first
+       if (( evalve[i].Fertigate != 0 ) && (( evalve[i].TypeMaster & 0x80 ) == 0 ))  {                   // check if switched on first and check its not a master valve
           for ( j = 0 ; j < MAX_FERT ; j++){
             if (((evalve[i].Fertigate & ( 0x01 << j )) != 0 ) && ( efert[j].CurrentQty > 0 )) {          // check which fertigation channels are active
               if ((( efert[j].DaysEnable & ( 0x01 << (k-1) )) != 0  ) && (( efert[j].DaysEnable & ( 0x80 )) != 0  )) {   // check if enabled for these days

@@ -200,7 +200,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   long lMaxDisplayValve ;                 // 18
   long lNodeAddress ;                     // 22 
   float fTimeZone ;                       // 26 
-  IPAddress RCIP ;                        // (192,168,2,255)  30
+  char RCIP[16] ;                         // (192,168,2,255)  30
   char NodeName[16] ;                     // 46 
   char nssid[16] ;                        // 62  
   char npassword[16] ;                    // 78
@@ -219,6 +219,24 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
 } general_housekeeping_stuff_t ;          // computer says it's 136 not 130 ??? is my maths crap ????
 
 general_housekeeping_stuff_t ghks ;
+
+typedef struct __attribute__((__packed__)) {
+  int16_t lATTG  ;            // programed (automatic) minutes
+  int16_t lTTG   ;            // minutes  
+  int16_t lTTC ;              // time to clear the line after pump has last activated (seconds -- counts down)    
+  uint8_t Fertigate ;         // 8 bits for tanks 0 -> 7
+  uint8_t ValveNo ;
+  int16_t Node ;
+  float   Flowrate ;          // L/s  flow ??
+} cnc_v_t ; 
+
+typedef struct __attribute__((__packed__)) {
+  int16_t      cmd ;
+  int16_t      snode ;
+  uint8_t      valves ;          // number to follow
+  cnc_v_t      cv[MAX_VALVE] ;   // the most that we can have 
+} cnc_t ; 
+
 
 char cssid[32] = {"Configure_XXXXXXXX\0"} ;
 char *host = "Control_00000000\0";                // overwrite these later with correct chip ID
@@ -344,7 +362,7 @@ int i , k , j = 0;
   display.drawString(63, 16, "Controler");
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);  
-  display.drawString(0, 40, "Copyright (c) 2019");
+  display.drawString(0, 40, "Copyright (c) 2020");
   display.drawString(0, 50, "Dougal Plummer");
   display.setTextAlignment(TEXT_ALIGN_RIGHT);  
   display.drawString(127, 50, String(Toleo));
@@ -472,12 +490,13 @@ int i , k , j = 0;
     display.drawString(0, 0, "Chip ID " + String(ESP.getChipId(), HEX) );
     display.drawString(0, 9, String("SSID:") );
     display.drawString(0, 18, String("Password:") );
+    display.drawString(0, 36 , String(1.0*j/2) + String(" (s)" ));   
+    display.drawString(42, 36 , String(ghks.NodeName));   
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(128 , 0, String(WiFi.RSSI()));
     display.drawString(128, 9, String(ghks.nssid) );
     display.drawString(128, 18, String(ghks.npassword) );
     display.drawString(j*4, 27 , String(">") );
-    display.drawString(0, 36 , String(1.0*j/2) + String(" (s)" ));   
     snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
     display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(63 , 54 ,  String(buff) );
@@ -521,8 +540,8 @@ int i , k , j = 0;
     ctrludp.begin(ghks.localPortCtrl);                 // recieve on the control port
     display.drawString(64, 44, "CTRL UDP " );
     display.display();
-//    Serial.print("Control Local UDP port: ");
-//    Serial.println(ctrludp.localPort());
+    Serial.print("Control Local UDP port: ");
+    Serial.println(ctrludp.localPort());
                                                 // end of the normal setup
  
   sprintf(host,"Control_%08X\0",ESP.getChipId());
@@ -564,12 +583,13 @@ int i , k , j = 0;
   DS3231_get(&tc);
   rtc_status = DS3231_get_sreg();
   if (((tc.mon < 1 )|| (tc.mon > 12 ))&& (tc.wday>8)){  // no rtc to load off
-    Serial.println("NO RTC ?");
+    Serial.println("What NO DS3231 RTC ?");
   }else{
     setTime((int)tc.hour,(int)tc.min,(int)tc.sec,(int)tc.mday,(int)tc.mon,(int)tc.year ) ; // set the internal RTC
     hasRTC = true ;
-    Serial.println("Has RTC ?");
+    Serial.println("Look like it has DS3231 RTC ?");
     rtc_temp = DS3231_get_treg(); 
+    rtc_hour = hour();  // dont need to updte the time if we have an RTC onboard --- assume its working ok
   }
   rtc_min = minute();
   rtc_sec = second();
@@ -589,9 +609,9 @@ int x , y ;
 int board ;
 uint8_t OnPol ;
 uint8_t OffPol ;
-uint8_t OnPulse ;
-uint8_t OffPulse ;
-bool bSendCtrlPacket = false ;
+int OnPulse ;
+int OffPulse ;
+bool bSendCtrlPacket ;
 bool bDirty = false ;
 bool bDirty2 = false ;
 long lTD ;
@@ -641,12 +661,15 @@ long lTD ;
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    switch (rtc_sec & 0x03){
+    switch (( rtc_sec >> 1 ) & 0x03){
       case 1:
         snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
       break;
       case 2:
         snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
+      break;
+      case 3:
+       snprintf(buff, BUFF_MAX, "%s - %d", ghks.NodeName,ghks.lNodeAddress );   
       break;
       default:
         snprintf(buff, BUFF_MAX, "%s", cssid );            
@@ -661,6 +684,10 @@ long lTD ;
     for (i = 0 ; i < MAX_VALVE ; i++ ) {              // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
       if (( evalve[i].TypeMaster & 0x80 ) != 0 ){      // This is the master valve check
         vvalve[i].lTTG = 0 ;
+        if ( evalve[i].Node != 0 ){
+           evalve[i].Fertigate = 0 ;
+           evalve[i].Flowrate = 0 ;
+        }
         for (k = 0 ; k < MAX_VALVE ; k++ ) {          // scan the list again  
           j = ( evalve[k].TypeMaster & 0x3f ) - 1 ;        // look for a subordinate valve
           if (j == i){
@@ -671,6 +698,10 @@ long lTD ;
             }  
             if ( vvalve[i].lTTG < vvalve[k].lTTG ){
               vvalve[i].lTTG = vvalve[k].lTTG ;
+            }
+            if (((vvalve[k].lTTG > 0 )||(vvalve[k].lATTG)) && ( evalve[i].Node != 0 )){  // if subordinate going then add the other stuff
+              evalve[i].Fertigate |= evalve[k].Fertigate ;
+              evalve[i].Flowrate += evalve[k].Flowrate ;
             }
           }    
         }
@@ -738,12 +769,12 @@ long lTD ;
       }
       OnPol = ((evalve[i].OnOffPolPulse & 0x80  ) >> 7  ) ;
       OffPol = ((evalve[i].OnOffPolPulse & 0x08  ) >> 3  ) ;
-      OnPulse = ((evalve[i].OnOffPolPulse & 0x70  ) >> 4  ) ;
-      OffPulse = ((evalve[i].OnOffPolPulse & 0x07  )  ) ;
+      OnPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x70  ) >> 4  )) ;
+      OffPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x07  )  )) ;
       OnPol = LOW ;
       OffPol = HIGH ;
-      OnPulse =  ghks.lPulseTime % 128 ;
-      OffPulse =  ghks.lPulseTime % 128 ;
+//      OnPulse =  ghks.lPulseTime % 128 ;
+//      OffPulse =  ghks.lPulseTime % 128 ;
       if (((vvalve[i].lTTG > 0 )|| (vvalve[i].lATTG > 0))&&(!vvalve[i].bOnOff)){
         vvalve[i].bOnOff = true ;
         board = ( evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ; 
@@ -753,6 +784,7 @@ long lTD ;
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , 0 ) ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );           // Pulse On          
+//          Serial.println("On Pulse " + String(OnPulse));
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }        
@@ -766,6 +798,7 @@ long lTD ;
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , 0 ) ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
+//          Serial.println("Off Pulse " + String(OffPulse));
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , OffPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }
@@ -796,7 +829,6 @@ long lTD ;
   }                         // end of the once per second stuff
 
   if (rtc_hour != hour()){
-    bSendCtrlPacket = true ;
     if ( !bConfig ) { // ie we have a network
       sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour
     }else{
@@ -808,6 +840,7 @@ long lTD ;
     rtc_hour = hour();
   }
   if ( rtc_min != minute()){
+    bSendCtrlPacket = true ;
     lMinUpTime++ ;
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( vvalve[i].lATTG > 0 ){
@@ -829,6 +862,9 @@ long lTD ;
     }
     rtc_min = minute() ;
     fertigation_min();
+    if (WiFi.isConnected())  {
+      MyIP =  WiFi.localIP() ;
+    }
   }
   if ((minute() == 0) && (hour() != rtc_fert_hour)){
     SaveCurrentQty(true);
@@ -847,11 +883,12 @@ long lTD ;
   }
 
   if (bSendCtrlPacket){
-    sendCTRLpacket(ghks.RCIP) ;
+    sendCTRLpacket() ;
+    bSendCtrlPacket = false ;
   }
   if (lTimePrev > ( lTime + 100000 )){ // Housekeeping --- has wrapped around so back to zero
     lTimePrev = lTime ; // skip a bit 
-//    Serial.println("Wrap around");
+    Serial.println("Wrap around");
   }
   
 //  digitalWrite(SCOPE_PIN,!digitalRead(SCOPE_PIN));  // my scope says we are doing this loop at an unreasonable speed except when we do web stuff
@@ -889,7 +926,10 @@ long lTD ;
       lTimeNext = millis() + 30000 ;
     }
   }else{
-    bPrevConnectionStatus = true ;
+    if ( !bPrevConnectionStatus  ){
+      MyIP = WiFi.localIP() ;
+      bPrevConnectionStatus = true ;
+    }
   }  
 
 

@@ -11,6 +11,34 @@ int k ;
   return(bRet);  
 }
 
+int SolPulseWidth(int PulseIndex){
+  switch (PulseIndex){
+    case 1:
+      return(20);
+    break;
+    case 2:
+      return(40);
+    break;
+    case 3:
+      return(80);
+    break;
+    case 4:
+      return(160);
+    break;
+    case 5:
+      return(320);
+    break;
+    case 6:
+      return(640);
+    break;
+    case 7:
+      return(1280);
+    break;
+    default:
+      return(10);
+    break;
+  }
+}
 
 void ActivateOutput(int Board, int Bit, bool State, int PulseTime){
 int ii , k = -1 ;  
@@ -50,7 +78,13 @@ int j ;
         }
         Serial.println("MCP23017 Output " + String(j) + " Board " + String(k) + " time " + String(PulseTime) + " state " + String(State));
         if ( PulseTime > 0 ){
-          mcp[k].pulsepin(j,PulseTime,State) ;        
+          if (PulseTime > 127 ){ // cant do more than 128ms via the lib so do it old school if needed
+            mcp[k].digitalWrite( j , State) ;              
+            delay(PulseTime);
+            mcp[k].digitalWrite( j , !State) ;                                    
+          }else{
+            mcp[k].pulsepin(j,PulseTime,State) ;        
+          }
         }else{
           mcp[k].digitalWrite( j , State) ;              
         }        

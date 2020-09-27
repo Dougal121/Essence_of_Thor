@@ -36,7 +36,7 @@ int k ;
 
 
 void handleProgramNew(){
-  int i , ii , iTmp , iX ;
+  int i , ii , iTmp , iX ,iRun ;
   uint8_t j , k , kk ;
   int iProgNum ;
   String message ;  
@@ -52,7 +52,7 @@ void handleProgramNew(){
     i = String(server.argName(j)).indexOf("prgm");
     if (i != -1){  // look at the program number else it stays zero
       iProgNum = String(server.arg(j)).toInt() ;  
-      iProgNum = constrain(iProgNum,-1,MAX_PROGRAM);
+      iProgNum = constrain(iProgNum,-1,MAX_PROGRAM_HEADER);
 /*      MyNum = String(iProgNum) ;
       if ( MyNum.length() == 1 ) {
         MyNum = "0" + MyNum ;
@@ -66,9 +66,9 @@ void handleProgramNew(){
       }      
       i = String(server.argName(j)).indexOf("s" + MyNum + "rt");
       if (i != -1){  // 
-        k = String(server.arg(j)).toInt()  ;
-        k = constrain(k,0,MAX_MINUTES) ;
-        pn.sh[ii].RunTime = k ;
+        iRun = String(server.arg(j)).toInt()  ;
+        iRun = constrain(iRun,0,MAX_MINUTES) ;
+        pn.sh[ii].RunTime = iRun ;
       }        
       i = String(server.argName(j)).indexOf("s" + MyNum + "pr");
       if (i != -1){  // 
@@ -269,7 +269,7 @@ void handleProgramNew(){
       message += F("</select></td>");
       server.sendContent(message) ;
       
-      message = "<td>" + String(i) + "</td'>" ;
+      message = "<td>" + String(i+1) + "</td'>" ;
       server.sendContent(message) ;
       message = "" ;
       for ( k = 0 ; k < ghks.lMaxDisplayValve ; k++ ){
