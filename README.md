@@ -6,7 +6,7 @@ First versions running on the ESP8266 <br>
 Compiled in the arduino IDE and trageting LOLIN (WeMos) ESP8266/ESP32 compatible bopards.<br>
 
 More details on construction
-https://www.hackster.io/DougalPlummer/essence-of-thor-part-1-4a83a1
+https://www.hackster.io/dougal/essence-of-thor-part-1-4a83a1
 
 <b>I/O Support for</b><br>
 MCP23017 (via I2C)<br>
