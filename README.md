@@ -19,5 +19,5 @@ LocalCPU I/O<br>
 03/05/2020 Load in fixes for connection and UDP without DNS lookups.<br>
 16/05/2020 Restore and backup of users config to PC<br>
 27/09/2020 Fertigation uplink between nodes working - also two more bugs in GUI fixed<br>
-
+06/04/2020 Valve logging working ... Started on email alarms.<br>
 
