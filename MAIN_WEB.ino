@@ -21,35 +21,47 @@ void SendHTTPHeader(){
   server.sendHeader(F("X-Powered-by"),F("Dougal-1.0"),false);
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
-  server.sendContent(F("<!DOCTYPE HTML>"));
-  server.sendContent("<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>");
-  server.sendContent(F("<meta name=viewport content='width=320, auto inital-scale=1'>"));
-  server.sendContent(F("</head><body><html lang='en'><center><h3>"));   
-  server.sendContent("<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a></h3>");
+  String message = F("<!DOCTYPE HTML>");
+  message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
+  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>");
+  message += F("</head><body><html lang='en'><center><h3>");   
+  message += "<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a></h3>";
+  server.sendContent(message) ;         
 }
 
 
 
 void SendHTTPPageFooter(){
-  server.sendContent(F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>")) ;         
-  server.sendContent(F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>")) ;   
-  server.sendContent(F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>")) ;     
-  server.sendContent("<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>");
-//  server.sendContent(F("<a href='/?command=668'>Save Fert Current QTY</a><br>"));
-  server.sendContent(F("<a href='/eeprom'>EEPROM Memory Contents</a><br>"));
-  server.sendContent(F("<a href='/setup'>Node Setup</a><br>"));
-  server.sendContent(F("<a href='/info'>Node Infomation</a><br>"));
-  server.sendContent(F("<a href='/btest'>Relay Board Test</a><br>"));
-  server.sendContent(F("<a href='/vsss'>view volatile memory structures</a><br>"));
+String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>") ;
+  message += F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>")  ;   
+  message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br>");
+  message += F("<a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br>");
+  message += F("<a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>") ;     
+  message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>";
+//  message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>");
+  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>");
+  message += F("<a href='/rtceeprom'>RTC EEPROM Memory Contents (Valve Log Area)</a><br>");
+  message += F("<a href='/valvelog'>Valve Log</a><br>");
+  message += F("<a href='/setup'>Node Setup</a><br>");
+  message += F("<a href='/email'>Email Setup</a><br>");
+  message += F("<a href='/info'>Node Infomation</a><br>");
+  message += F("<a href='/btest'>Relay Board Test</a><br>");
+  message += F("<a href='/vsss'>view volatile memory structures</a><br>");
+  message += F("<a href='/fertque'>view fertigation data que</a><br>");
+  
   if (!WiFi.isConnected()) {
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
   }else{
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
   }
-  server.sendContent("<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>");  
-  server.sendContent("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
-  server.sendContent("<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br>");  
+  message += "<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>";  
+  message += F("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
+  message += "<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br><br>";  
+  snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
+  message += "Computer Uptime <b>"+String(buff)+"</b> (day:hr:min) <br>" ;
+  
   server.sendContent(F("</body></html>\r\n"));
+  server.sendContent(message) ;         
 }
 
 
@@ -130,6 +142,12 @@ void handleRoot() {
         case 9: //  Warm Reboot
           ESP.restart() ;
         break;
+        case 0: // all stop
+          for ( ii = 0 ; ii < ghks.lMaxDisplayValve ; ii++){         // handle all the valve control commands for any and all valves
+            vvalve[ii].bOnOff = true ;                               // turn on to ensure a pulse is generated 
+            vvalve[ii].lTTG = 0 ;                                    // reset this to zero 
+          }          
+        break;
         case 42:
           if ( iTestMode == -1 ) {
             iTestMode = 0 ;            
@@ -145,11 +163,26 @@ void handleRoot() {
           LoadParamsFromEEPROM(false);
         break;
         case 665:
+          bManSet = true ;
           sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour  
         break;
         case 668:
           ii = SaveCurrentQty(false);
 //          Serial.println(String(ii) + " Fert records updated");
+        break;
+        case 998:
+          ReadValveLogsFromEEPROM();
+          iValveLogTTG = (ghks.ValveLogOptions & 0x1f) * 10 + 20 ; // read data drop eemprom and over right memory
+        break;
+        case 997:
+          WriteValveLogsToEEPROM();
+          iValveLogTTG = (ghks.ValveLogOptions & 0x1f) * 10 + 20 ; // write data from memory and over write eeprom data
+        break;
+        case 999:
+          ZeroValveLogsMemory(15);
+        break;           
+        case 121:
+          ResetSMTPInfo();
         break;
       }  
     }
@@ -487,132 +520,12 @@ void handleRoot() {
         DS3231_set_sreg(rtc_status & 0x7f ) ; // clear the clock fail bit when you set the time
       }
     }        
-    i = String(server.argName(j)).indexOf("ptime");
-    if (i != -1){  // 
-      ghks.lPulseTime = String(server.arg(j)).toInt() ;
-      ghks.lPulseTime = constrain(ghks.lPulseTime,10,1000);
-    }        
-    i = String(server.argName(j)).indexOf("ndadd");
-    if (i != -1){  // 
-      ghks.lNodeAddress = String(server.arg(j)).toInt() ;
-      ghks.lNodeAddress = constrain(ghks.lNodeAddress,0,32768);
-    }        
-    i = String(server.argName(j)).indexOf("tzone");
-    if (i != -1){  // 
-      ghks.fTimeZone = String(server.arg(j)).toFloat() ;
-      ghks.fTimeZone = constrain(ghks.fTimeZone,-12,12);
-      bDoTimeUpdate = true ; // trigger and update to fix the time
-    }        
-    i = String(server.argName(j)).indexOf("disop");
-    if (i != -1){  // 
-      ghks.lDisplayOptions = String(server.arg(j)).toInt() ;
-      ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
-    }  
-    i = String(server.argName(j)).indexOf("netop");
-    if (i != -1){  // 
-      ghks.lNetworkOptions = String(server.arg(j)).toInt() ;
-      ghks.lNetworkOptions = constrain(ghks.lNetworkOptions,0,255);
-    }
-    i = String(server.argName(j)).indexOf("maxvn");
-    if (i != -1){  // 
-      ghks.lMaxDisplayValve = String(server.arg(j)).toInt() ;
-      ghks.lMaxDisplayValve = constrain(ghks.lMaxDisplayValve,2,MAX_VALVE);
-    }  
-    
-    i = String(server.argName(j)).indexOf("prgop");
-    if (i != -1){  // 
-      ghks.lProgMethod = String(server.arg(j)).toInt() ;
-      ghks.lProgMethod = constrain(ghks.lProgMethod,0,1);
-    }          
-    i = String(server.argName(j)).indexOf("lpntp");
-    if (i != -1){  // 
-      ghks.localPort = String(server.arg(j)).toInt() ;
-      ghks.localPort = constrain(ghks.localPort,1,65535);
-    }        
-    i = String(server.argName(j)).indexOf("lpctr");
-    if (i != -1){  // 
-      ghks.localPortCtrl = String(server.arg(j)).toInt() ;
-      ghks.localPortCtrl = constrain(ghks.localPortCtrl,1,65535);
-    }        
-    i = String(server.argName(j)).indexOf("rpctr");
-    if (i != -1){  // 
-      ghks.RemotePortCtrl = String(server.arg(j)).toInt() ;
-      ghks.RemotePortCtrl = constrain(ghks.RemotePortCtrl,1,65535);
-    }        
+
     i = String(server.argName(j)).indexOf("dontp");
     if (i != -1){  // have a request to request a time update
       bDoTimeUpdate = true ;
     }
-    i = String(server.argName(j)).indexOf("cname");
-    if (i != -1){  // have a request to request a time update
-     String(server.arg(j)).toCharArray( ghks.NodeName , sizeof(ghks.NodeName)) ;
-    }
-    i = String(server.argName(j)).indexOf("rpcip");
-    if (i != -1){  // have a request to request an IP address
-      ghks.RCIP[0] = String(server.arg(j)).substring(0,3).toInt() ;
-      ghks.RCIP[1] =String(server.arg(j)).substring(4,7).toInt() ;
-      ghks.RCIP[2] = String(server.arg(j)).substring(8,11).toInt() ;
-      ghks.RCIP[3] =String(server.arg(j)).substring(12,15).toInt() ;
-    }
-    i = String(server.argName(j)).indexOf("staip");
-    if (i != -1){  // have a request to request an IP address
-      ghks.IPStatic[0] = String(server.arg(j)).substring(0,3).toInt() ;
-      ghks.IPStatic[1] =String(server.arg(j)).substring(4,7).toInt() ;
-      ghks.IPStatic[2] = String(server.arg(j)).substring(8,11).toInt() ;
-      ghks.IPStatic[3] =String(server.arg(j)).substring(12,15).toInt() ;
-    }
-    i = String(server.argName(j)).indexOf("gatip");
-    if (i != -1){  // have a request to request an IP address
-      ghks.IPGateway[0] = String(server.arg(j)).substring(0,3).toInt() ;
-      ghks.IPGateway[1] =String(server.arg(j)).substring(4,7).toInt() ;
-      ghks.IPGateway[2] = String(server.arg(j)).substring(8,11).toInt() ;
-      ghks.IPGateway[3] =String(server.arg(j)).substring(12,15).toInt() ;
-    }
-    i = String(server.argName(j)).indexOf("mskip");
-    if (i != -1){  // have a request to request an IP address
-      ghks.IPMask[0] = String(server.arg(j)).substring(0,3).toInt() ;
-      ghks.IPMask[1] =String(server.arg(j)).substring(4,7).toInt() ;
-      ghks.IPMask[2] = String(server.arg(j)).substring(8,11).toInt() ;
-      ghks.IPMask[3] =String(server.arg(j)).substring(12,15).toInt() ;
-    }
-    i = String(server.argName(j)).indexOf("dnsip");
-    if (i != -1){  // have a request to request an IP address
-      ghks.IPDNS[0] = String(server.arg(j)).substring(0,3).toInt() ;
-      ghks.IPDNS[1] =String(server.arg(j)).substring(4,7).toInt() ;
-      ghks.IPDNS[2] = String(server.arg(j)).substring(8,11).toInt() ;
-      ghks.IPDNS[3] =String(server.arg(j)).substring(12,15).toInt() ;
-    }
-    
-    i = String(server.argName(j)).indexOf("atoff");
-    if (i != -1){  // have a request to request a time update
-      tm.Year = (String(server.arg(j)).substring(0,4).toInt()-1970) ;
-      tm.Month =(String(server.arg(j)).substring(5,7).toInt()) ;
-      tm.Day = (String(server.arg(j)).substring(8,10).toInt()) ;
-      tm.Hour =(String(server.arg(j)).substring(11,13).toInt()) ;
-      tm.Minute = (String(server.arg(j)).substring(14,16).toInt()) ;
-      tm.Second = 0 ;
-      ghks.AutoOff_t = makeTime(tm);
-    }  
-    i = String(server.argName(j)).indexOf("nssid");
-    if (i != -1){                                    // SSID
- //    Serial.println("SookyLala 1 ") ;
-     String(server.arg(j)).toCharArray( ghks.nssid , sizeof(ghks.nssid)) ;
-    }
-    
-    i = String(server.argName(j)).indexOf("npass");
-    if (i != -1){                                    // Password
-     String(server.arg(j)).toCharArray( ghks.npassword , sizeof(ghks.npassword)) ;
-    }
-    
-    i = String(server.argName(j)).indexOf("cpass");
-    if (i != -1){                                    // Password
-     String(server.arg(j)).toCharArray( ghks.cpassword , sizeof(ghks.cpassword)) ;
-    }
-    
-    i = String(server.argName(j)).indexOf("timsv");
-    if (i != -1){                                    // timesvr
-     String(server.arg(j)).toCharArray( ghks.timeServer , sizeof(ghks.timeServer)) ;
-    }
+
 
     i = String(server.argName(j)).indexOf("testb");
     if (i != -1){                                    // test board
@@ -716,124 +629,6 @@ void handleRoot() {
     server.sendContent(F("</table>"));
   }
     
-  if (String(server.uri()).indexOf("setup")>0) {  // ################  SETUP OF THE NODE #####################################
-    bDefault = false ;
-    server.sendContent("<form method=post action=" + server.uri() + "><table border=1 title='Node Settings'>");
-    server.sendContent(F("<tr><th>Parameter</th><th>Value</th><th><input type='submit' value='SET'></th></tr>"));
-  
-    server.sendContent(F("<tr><td>Controler Name</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='cname' value='"+String(ghks.NodeName)+"' maxlength=15 size=12></td><td></td></tr>");
-  
-    snprintf(buff, BUFF_MAX, "%04d/%02d/%02d %02d:%02d", year(ghks.AutoOff_t), month(ghks.AutoOff_t), day(ghks.AutoOff_t) , hour(ghks.AutoOff_t), minute(ghks.AutoOff_t));
-    if (ghks.AutoOff_t > now()){
-      MyColor =  F("bgcolor=red") ;
-    }else{
-      MyColor =  "" ;
-    }
-    server.sendContent("<tr><td "+String(MyColor)+">Auto Off Until</td><td align=center>") ; 
-    server.sendContent("<input type='text' name='atoff' value='"+ String(buff) + "' size=12></td><td>(yyyy/mm/dd)</td></tr>");
-  
-    server.sendContent(F("<tr><td>Activation Pulse Spacing</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='ptime' value='" + String(ghks.lPulseTime) + "' size=12></td><td>(ms)</td></tr>");
-  
-    server.sendContent(F("<tr><td>Node Address</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='ndadd' value='" + String(ghks.lNodeAddress) + "' size=12></td><td>"+String(ghks.lNodeAddress & 0xff)+"</td></tr>");
-  
-    server.sendContent(F("<tr><td>Time Zone</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='tzone' value='" + String(ghks.fTimeZone,1) + "' size=12></td><td>(Hours)</td></tr>");
-
-    server.sendContent(F("<tr><td>Display Options</td><td align=center>")) ; 
-    server.sendContent(F("<select name='disop'>")) ;
-    if (ghks.lDisplayOptions == 0 ){
-      server.sendContent(F("<option value='0' SELECTED>0 - Normal")); 
-      server.sendContent(F("<option value='1'>1 - Invert")); 
-    }else{
-      server.sendContent(F("<option value='0'>0 - Normal")); 
-      server.sendContent(F("<option value='1' SELECTED>1 - Invert")); 
-    }
-    server.sendContent(F("</select></td><td></td></tr>"));
-
-    server.sendContent(F("<tr><td>Display Number of Valves</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='maxvn' value='" + String(ghks.lMaxDisplayValve) + "' size=4 maxlength=2></td><td>2 - "+String(MAX_VALVE)+"</td></tr>");
-
-    server.sendContent(F("<tr><td>Program Method</td><td align=center>")) ; 
-    server.sendContent(F("<select name='prgop'>")) ;
-    if (ghks.lProgMethod == 0 ){
-      server.sendContent(F("<option value='0' SELECTED>0 By Valve")); 
-      server.sendContent(F("<option value='1'>1 By Progam / Shift")); 
-    }else{
-      server.sendContent(F("<option value='0'>0 By Valve")); 
-      server.sendContent(F("<option value='1' SELECTED>1 By Progam / Shift")); 
-    }
-    server.sendContent(F("</select></td><td></td></tr></form>"));
-
-    server.sendContent("<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>") ; 
-  
-    server.sendContent(F("<tr><td>Local UDP Port NTP</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td><input type='submit' value='SET'></td></tr>");
-  
-    server.sendContent(F("<tr><td>Local UDP Port Control</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='lpctr' value='" + String(ghks.localPortCtrl) + "' size=12></td><td></td></tr>");
-  
-    server.sendContent(F("<tr><td>Remote UDP Port Control</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='rpctr' value='" + String(ghks.RemotePortCtrl) + "' size=12></td><td></td></tr>");
-
-    server.sendContent(F("<tr><td>Network SSID</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='nssid' value='" + String(ghks.nssid) + "' maxlength=15 size=12></td><td></td></tr>");
-
-    server.sendContent(F("<tr><td>Network Password</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='npass' value='" + String(ghks.npassword) + "' maxlength=15 size=12></td><td></td></tr>");
-
-    server.sendContent(F("<tr><td>Configure Password</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='cpass' value='" + String(ghks.cpassword) + "' maxlength=15 size=12></td><td></td></tr>");
-
-    server.sendContent(F("<tr><td>Time Server</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='timsv' value='" + String(ghks.timeServer) + "' maxlength=23 size=12></td><td></td></tr>");
- 
-    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.RCIP[0],ghks.RCIP[1],ghks.RCIP[2],ghks.RCIP[3]);
-    server.sendContent(F("<tr><td>Remote IP Address Control</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr></form>");
-    
-    server.sendContent("<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>") ; 
-
-    server.sendContent(F("<tr><td>Network Options</td><td align=center>")) ; 
-    server.sendContent(F("<select name='netop'>")) ;
-    if (ghks.lNetworkOptions == 0 ){
-      server.sendContent(F("<option value='0' SELECTED>0 - DHCP")); 
-      server.sendContent(F("<option value='1'>1 - Static")); 
-    }else{
-      server.sendContent(F("<option value='0'>0 - DHCP")); 
-      server.sendContent(F("<option value='1' SELECTED>1 - Static IP")); 
-    }
-    server.sendContent(F("</select></td><td><input type='submit' value='SET'></td></tr>"));
-    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPStatic[0],ghks.IPStatic[1],ghks.IPStatic[2],ghks.IPStatic[3]);
-    server.sendContent(F("<tr><td>Static IP Address</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='staip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
-
-    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPGateway[0],ghks.IPGateway[1],ghks.IPGateway[2],ghks.IPGateway[3]);
-    server.sendContent(F("<tr><td>Gateway IP Address</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='gatip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
-  
-    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPMask[0],ghks.IPMask[1],ghks.IPMask[2],ghks.IPMask[3]);
-    server.sendContent(F("<tr><td>IP Mask</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='mskip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
-
-    snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPDNS[0],ghks.IPDNS[1],ghks.IPDNS[2],ghks.IPDNS[3]);
-    server.sendContent(F("<tr><td>DNS IP Address</td><td align=center>")) ; 
-    server.sendContent("<input type='text' name='dnsip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");
-
-    server.sendContent("<tr><td>Last Scan Speed</td><td align=center>" + String(lScanLast) + "</td><td>(per second)</td></tr>" ) ;    
-    if( hasRTC ){
-      rtc_status = DS3231_get_sreg();
-      if (( rtc_status & 0x80 ) != 0 ){
-        server.sendContent(F("<tr><td>RTC Battery</td><td align=center bgcolor='red'>DEPLETED</td><td></td></tr>")) ;            
-      }else{
-        server.sendContent(F("<tr><td>RTC Battery</td><td align=center bgcolor='green'>-- OK --</td><td></td></tr>")) ;                    
-      }
-      server.sendContent("<tr><td>RTC Temperature</td><td align=center>"+String(rtc_temp,1)+"</td><td>(C)</td></tr>") ;                    
-    }
-    server.sendContent(F("</form></table>"));
-  }
   
   if (String(server.uri()).indexOf("prog")>0) {  // #############################  program interface  #####################################
     bDefault = false ;
@@ -965,10 +760,10 @@ void handleRoot() {
     message += F("<tr><th rowspan=2>Tank</th>") ;
     if (iPage==0) {
       message += F("<th colspan=8>Enable</th>");
-      message += F("<th>Current Qty</th><th>Max Qty</th><th rowspan=2>Description</th><th rowspan=2>Type</th><th rowspan=2>Master</th>");
+      message += F("<th>Current Qty</th><th>Max Qty</th><th rowspan=2>Description</th><th rowspan=2>Type</th><th rowspan=2>Master</th><th colspan=2 rowspan=2>.</th>");
     }  
     if (iPage==2) {
-      message += F("<th>On Time</th><th>Off time</th><th>Base Flow</th><th>Pump Rate</th><th colspan=2>Connection</th></tr>") ; 
+      message += F("<th>On Time</th><th>Off time</th><th>Base Flow</th><th>Pump Rate</th><th colspan=2>Connection</th><th rowspan=2>.</th></tr>") ; 
     }
     message += F("<tr>") ;                   // second header row 
     if (iPage==0) {
@@ -1056,7 +851,11 @@ void handleRoot() {
         message += "<td><input type='text' name='xbas"+String(i)+"' value='" + String(efert[i].BaseFlow) + "' maxlength=5 size=2></td><td><input type='text' name='xpmr"+String(i)+"' value='" + String(efert[i].PumpRate) + "' maxlength=5 size=2>";
         message += "<td><input type='text' name='xbba"+String(i)+"' value='" + String((efert[i].BoardBit & 0xf0 )>>4 ) + "' maxlength=5 size=2></td><td><input type='text' name='xbbb"+String(i)+"' value='" + String(efert[i].BoardBit & 0x0F) + "' maxlength=5 size=2>";
       }
-      message += F("<td><input type='submit' value='SET'></td></form></tr>") ;
+      message += F("<td><input type='submit' value='SET'></td></form>");
+      if (iPage==0) {
+        message += "<td><form method=post action=" + server.uri() + "><input type='hidden' name='xcqt"+String(i)+"' value='" + String(efert[i].MaxQty) + "'><input type='submit' value='REFILL'></form></td>" ;
+      }
+      message += F("</tr>") ;
       server.sendContent(message) ;
       message = "" ;
     }
@@ -1252,6 +1051,9 @@ void handleRoot() {
       server.sendContent(message) ;
       message = "" ;
     }
+    if ( !bExtraValve ){
+      message += "<tr><form method=post action=" + server.uri() + "><td colspan=8 align=center><input type='hidden' name='command' value='0'><input type='submit' value='### MANUAL ALL OFF ###'></td></form></tr>" ;
+    }
     message += F("</table>");
     server.sendContent(message) ;
   }
@@ -1259,4 +1061,5 @@ void handleRoot() {
   SendHTTPPageFooter();
 
 }
+
 

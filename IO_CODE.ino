@@ -66,7 +66,7 @@ int j ;
           k = ii ;
         }
       }
-      Serial.println("Board Array Address " + String(k));
+//      Serial.println("Board Array Address " + String(k));
       if ( k != -1 ){  // make sure the address is valid
         switch (eboard[Board].Translate ){
           case 0:  // no translation
@@ -76,7 +76,7 @@ int j ;
             j = mcp_relay_tranlate[Bit] ;
           break;
         }
-        Serial.println("MCP23017 Output " + String(j) + " Board " + String(k) + " time " + String(PulseTime) + " state " + String(State));
+//        Serial.println("MCP23017 Output " + String(j) + " Board " + String(k) + " time " + String(PulseTime) + " state " + String(State));
         if ( PulseTime > 0 ){
           if (PulseTime > 127 ){ // cant do more than 128ms via the lib so do it old school if needed
             mcp[k].digitalWrite( j , State) ;              
@@ -417,5 +417,6 @@ void ioScan() {
   SendHTTPPageFooter();  
 //  server.sendContent(F("<br><a href='/scan'>I2C Scan</a><br><a href='/'>Home</a></body></html>\r\n"));
 }
+
 
 

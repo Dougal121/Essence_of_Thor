@@ -81,6 +81,8 @@ float ot  ;
 uint8_t fbit , board ;
 bool bFValve = false ;
 bool bWValve = false ;
+bool bLowTank = false ;
+bool bEmptyTank = false ;
   k = 0 ;
   for ( i = 0 ; i < MAX_FERT ; i++){
     if ((efert[i].AType & 0x40 ) != 0  ) {  //  chemical valve coil    
@@ -155,6 +157,7 @@ bool bWValve = false ;
               }  
               if (( efert[i].AType & 0x10 ) != 0){   // normal pump
                 efert[i].CurrentQty -= ( efert[i].PumpRate * ot ) ; // dont decrement the tank if a master pump only do if normal pump
+                QueFertData(i, ( efert[i].PumpRate * ot ));              
               }else{
                 ot = 0 ; // start again for master pump and add up all the on times
                 for ( j = 0 ; j < MAX_FERT ; j++){
@@ -164,10 +167,12 @@ bool bWValve = false ;
                     }else{
                       ot += efert[j].OnTime  ;          
                     }
-                    efert[j].CurrentQty -= ( efert[i].PumpRate * ot ) ;   // need to decrement the  base solenoid/tank                
+                    efert[j].CurrentQty -= ( efert[i].PumpRate * ot ) ;   // need to decrement the  base solenoid/tank 
+                    QueFertData(j, ( efert[i].PumpRate * ot ));              
                   }
                 }  
               } 
+
               vfert[i].lTTG = ot ;       
               if ( ot > 0 ) {   
                 vfert[i].bOnOff = true ;
@@ -181,8 +186,32 @@ bool bWValve = false ;
         }
       break ;    
     }
+    if (( vfert[i].CurrentQtyPrev > 0 ) && ( efert[i].CurrentQty <= 0  )) {
+      bEmptyTank = true;
+    }
+    if (( vfert[i].CurrentQtyPrev > SMTP.LowTankQty ) && ( efert[i].CurrentQty <= SMTP.LowTankQty  )) {
+      bLowTank = true ;
+    }
+    vfert[i].CurrentQtyPrev = efert[i].CurrentQty ;
   }
+  if ( bLowTank  && SMTP.bUseEmail){
+    SendEmailToClient(1);  // tank low on chemical    
+  }
+  if ( bEmptyTank  && SMTP.bUseEmail){
+    SendEmailToClient(0);  // tank out of chemical
+  }  
   return(k) ;
+}
+
+bool IsDoingFert(void){
+int i ;
+bool bOn = false ;
+  for ( i = 0 ; i < MAX_FERT ; i++){
+    if ( vfert[i].bOnOff ){
+      bOn = true ;
+    }
+  }
+  return(bOn);
 }
 
 //  This will return the number of writes it does or will do --- pass in if you want it to actally save
@@ -208,4 +237,124 @@ float tmpFloat ;
   return(j);
 }
 
+void ZeroFertQue(void){
+int i ;
+  for (i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+    flq[i].RecDate = 0 ;
+    flq[i].FertMixID = 0 ;
+    flq[i].Valves = 0 ;
+    flq[i].Amount = 0 ;
+  }
+  return ;
+}
+
+int QueFertData(int TankID, float Amount){
+time_t MyTime = now() ;  
+int i, j = 0 ;
+int32_t MyValves = 0 ;
+
+//  Serial.println("Start Que Fert Data");
+  if ((ghks.ValveLogOptions & 0x40 )!=0 ){
+    for (i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+      if ( flq[i].RecDate == 0 ){   // the first empty record fill it
+        j = i ;
+        break ;  
+      }else{
+        if (flq[i].RecDate < MyTime) {  // otherwise look for the oldest record
+          MyTime = flq[i].RecDate ;
+          j = i ;
+        }
+      }
+    }
+    for (i = 0 ; i < MAX_VALVE ; i++ ) {  // work out the valve binary thingo  
+      if ( vvalve[i].bOnOff != 0 ){
+        MyValves += (int32_t)( 0x01 << i ) ; 
+      }
+    }
+//    Serial.println("Que Record " + String(j) + " Tank "+ String(TankID) + " Valves " + String(MyValves)+ " Amount " + String(Amount));
+    flq[j].RecDate = now() ;
+    flq[j].FertMixID = TankID ;
+    flq[j].Valves = MyValves ;
+    flq[j].Amount = Amount ;
+
+  }  
+  return(j) ;
+}
+
+int SendFertQueData(void){
+int j = 0 ;   
+HTTPClient http;
+String url ;
+int httpCode ;
+
+  if (WiFi.isConnected())  {
+//    Serial.println("Start Send Fert Data");
+    
+    for (int i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+       if ( flq[i].RecDate != 0 ){ 
+         url = "http://" + String(ghks.servername) + "/fert.asp?node="+String(ghks.lNodeAddress)+"&RecDate="+String(flq[i].RecDate)+"&FertMixID="+String(flq[i].FertMixID)+"&Valves="+String(flq[i].Valves)+"&Amount="+String(flq[i].Amount);
+         http.begin(url);                      //HTTP
+         httpCode = http.GET();
+         if ( httpCode ==  HTTP_CODE_OK ){    // if processed reset the que entry
+           Serial.println("Sent Fert Data");
+           flq[i].RecDate = 0 ;
+           j++;
+         }
+         http.end();
+         if ( httpCode !=  HTTP_CODE_OK ){    // if processed reset the que entry
+            Serial.println("FAIL Send Fert Data");
+            break;
+         }
+       }
+    }
+//    Serial.println("End Send Fert Data");
+  }else{
+    Serial.println("No Network to Send Fert Data");
+    j = -1 ; // error code for no network  
+  }
+  return(j);
+}
+
+void DisplayShowFertQue(){
+  int i , ii , iTmp , iX ;
+  uint8_t j , k , kk ;
+  String message ;  
+  String MyValves ;  
+  String MyColor ;
+  String MyColor2 ;
+
+  SerialOutParams();
+  
+  for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 333:  // zero all que
+          ZeroFertQue();
+        break;
+      }
+    }
+  }
+  
+  SendHTTPHeader();
+
+  message = F("<br><center><b>Fertigation Data Que</b><br><a href='/?command=333'>Zero/Reset Fertigation Data Que</a><br>");
+  message += F("<table border=1 title='Fertigation Data Que'>");
+  message += F("<tr><th>Log</th><th>Date</th><th>Tank</th><th>Valves</th><th>Amount</th></tr>");
+  server.sendContent(message);
+  message = "" ;
+  for (int i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+    if ( flq[i].RecDate != 0 ){
+      MyColor = F("bgcolor='orange'")  ;
+    }else{
+      MyColor = F("bgcolor='yellowgreen'")  ;      
+    }
+    snprintf(buff, BUFF_MAX, "%02d/%02d/%04d %02d:%02d:%02d", day(flq[i].RecDate), month(flq[i].RecDate), year(flq[i].RecDate), hour(flq[i].RecDate), minute(flq[i].RecDate), second(flq[i].RecDate) );     
+    MyValves = String(flq[i].Valves,BIN) + " - " + String(flq[i].Valves) ;
+    server.sendContent( "<tr><td "+MyColor+">"+String(i)+"</td><td>"+String(buff)+"</th><th>"+flq[i].FertMixID+"</th><th>"+MyValves+"</th><th>"+flq[i].Amount+"</th></tr>");
+  }
+  server.sendContent(F("</table>"));    
+  SendHTTPPageFooter();
+
+}
 

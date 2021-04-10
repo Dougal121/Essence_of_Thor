@@ -7,7 +7,25 @@ unsigned long processNTPpacket(void){
     unsigned long secsSince1900 = highWord << 16 | lowWord;                             // this is NTP time (seconds since Jan 1 1900):
     const unsigned long seventyYears = 2208988800UL;                                    // now convert NTP time into everyday time:     Unix time starts on Jan 1 1970. In seconds, that's 2208988800:   
     unsigned long epoch = secsSince1900 - seventyYears + long(SECS_PER_HOUR * ghks.fTimeZone );   // subtract seventy years:
+    unsigned long timediff = epoch - now();
+    timediff = abs(timediff) ;  // dont use to set RTC if more than 30 min out
+
     setTime((time_t)epoch);                                                             // update the clock
+
+    if (((year(epoch) > 2019 ) && ( timediff < 1800 )) || bManSet ){
+        tc.sec = second();     
+        tc.min = minute();     
+        tc.hour = hour();   
+        tc.wday = dayOfWeek((time_t)epoch);            
+        tc.mday = day();  
+        tc.mon = month();   
+        tc.year = year();       
+        DS3231_set(tc);                       // set the RTC as well
+        bManSet = false ;
+    }else{
+      Serial.println(F("*** Time NOT set to RTC year out of range ***"));  
+    }
+    
     Serial.print(F("Unix time = "));
     Serial.println(epoch);                                                              // print Unix time:
     rtc_hour = hour() ;                                                                 // stop this happining again now it's updated
@@ -16,9 +34,11 @@ unsigned long processNTPpacket(void){
 unsigned long sendNTPpacket(char* address){
 byte packetBuffer[ NTP_PACKET_SIZE];     //buffer to hold incoming and outgoing packets  
 IPAddress ntpIP ;
-  if (WiFi.isConnected())  {
+IPAddress MyIP;
+
+  MyIP =  WiFi.localIP() ;                  
+  if (WiFi.isConnected() && (MyIP[0] != 0 )&& (MyIP[4] != 0 ))  {
     Serial.println("sending NTP packet...");
-                      
     memset(packetBuffer, 0, NTP_PACKET_SIZE);    // set all bytes in the buffer to 0
     // Initialize values needed to form NTP request
     // (see URL above for details on the packets)
@@ -50,4 +70,5 @@ IPAddress ntpIP ;
     Serial.println("No WiFi - no point trying to send NTP packet...");
   }  
 }
+
 

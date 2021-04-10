@@ -28,9 +28,15 @@
 //#include "SH1106.h"
 #include "SH1106Wire.h"
 #include "ds3231.h"
+#include <ESPMail.h>
+#include "uEEPROMLib.h"    // 
+#include <ESP8266Ping.h>
 
+// uEEPROMLib eeprom;
+uEEPROMLib rtceeprom(0x57);
+ESPMail WDmail;
 
-#define BUFF_MAX 32
+#define BUFF_MAX 128
 /* Display settings */
 #define minRow       0              /* default =   0 */
 #define maxRow     127              /* default = 127 */
@@ -42,13 +48,15 @@
 
 //                 0x11223344
 #define MYVER 0x12345679     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+#define MYVER_NEW 0x12345680     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 
-const int MAX_EEPROM = 2000 ;
+const int MAX_EEPROM = 3000 ;  // changes from 2000 circa dec 2020
 //const byte SETPMODE_PIN = D8 ; 
 //const byte FLASH_BTN = D3 ;    // GPIO 0 = FLASH BUTTON 
 //const byte SCOPE_PIN = D7 ;
 const byte MAX_WIFI_TRIES = 45 ;
-const byte PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE_NEW = 320 ;   // where the irrigation valve setup and program information starts in eeprom
 const byte MAX_VALVE =  16 ;   // these two easily changed just watch the memory 
 const byte MAX_PROGRAM = 4 ;   // valves * program is the biggest memory number ... can do 32 x 4 OK but need to allocate more EEPROM
 const byte MAX_FERT = 6 ;      // fertigation units MAXIUM of 8 <- DEAL & CODE BREAKER
@@ -61,6 +69,10 @@ const byte MAX_STARTS = 4 ;
 const int  MAX_MINUTES = 10080 ; // maximum minutes in a 7 day cycle
 const byte MAX_BOARDS = 16 ;
 const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a system
+const byte MAX_DAYS = 7 ;
+const byte MAX_MONTHS = 12 ;
+const byte MAX_WEEKS = 53 ;
+const byte MAX_FERT_LOGS = 24 ;
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
 //SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
 SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
@@ -95,6 +107,19 @@ typedef struct __attribute__((__packed__)) {             // permanent record
   char    description[MAX_DESCRIPTION] ;   //
 } valve_t ;                  // 27 bytes    (16x = 432 )
 
+typedef struct __attribute__((__packed__)) {             // permanent record
+  uint16_t Weekly[MAX_WEEKS];
+  uint16_t Monthly[MAX_MONTHS]; 
+  uint16_t Daily[MAX_DAYS];        // Daily Totals
+} valve_totals_t ;                 // 64 bytes ( 16x = 1024 )        144 bytes ( 16x = 2304 )
+
+typedef struct __attribute__((__packed__)) {             // permanent record
+  time_t Weekly[MAX_WEEKS];      // have a date for the start of each period so ca tell if its been rolled over for reset purposes
+  time_t Monthly[MAX_MONTHS]; 
+  time_t Daily[MAX_DAYS];       
+} valve_totals_dates_t ;         // 7 + 12 + 53 = 72    x 4 for long =>  288 byes  ie two of the ones above     
+
+
 typedef struct __attribute__((__packed__)) {            // volitile stuff
   bool    bOnOff ;          // on off status
   uint8_t iFB    ;          // feedback status 
@@ -117,12 +142,22 @@ typedef struct __attribute__((__packed__)) {            // permanent record
   char    description[MAX_DESCRIPTION] ;  //
 } fertigation_t ;           // 31 bytes   (8x = 248)
 
+
+typedef struct __attribute__((__packed__)) {            // permanent record
+  time_t  RecDate;      // have a date for the start of each period so ca tell if its been rolled over for reset purposes
+  int32_t FertMixID ;   // mix or tank id 
+  int32_t Valves ; 
+  float   Amount ;
+} fertigation_log_que_item_t ;                              // maybe need 50 of these ? x 16 bytes
+
+
 typedef struct __attribute__((__packed__)) {            // volitile component 
   bool    bRun ;            // pump in run mode 
   bool    bEnable ;         // enable on / off
   bool    bOnOff ;          // on off status
   int16_t lTTG ;
   float   Flowrate ;
+  float   CurrentQtyPrev ;  // previous current qty 
 } fertigation__t ;          // 24 bytes
 
 typedef struct __attribute__((__packed__)) {                        // Permanent record
@@ -189,7 +224,10 @@ valve__t          vvalve[MAX_VALVE] ;    // volitile valve stuff
 fertigation__t    vfert[MAX_FERT] ;      // volitile fertigation stuff
 filter__t         vfilter[MAX_FILTER] ;  // volitile valve stuff
 local_t           elocal ;
-
+valve_totals_t    rtcVT[MAX_VALVE];      // to be read / stored in RTC board eeprom
+valve_totals_t    rtcTest;               // compare so we dont write the whole thing...  
+valve_totals_dates_t  rtcVTDates ;       // 
+fertigation_log_que_item_t  flq[MAX_FERT_LOGS] ; // memory only structure
 
 typedef struct __attribute__((__packed__)) {     // eeprom stuff
   unsigned int localPort = 2390;          // 2 local port to listen for NTP UDP packets
@@ -207,7 +245,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   time_t AutoOff_t ;                      // 82     auto off until time > this date   
   uint8_t lDisplayOptions  ;              // 83 
   uint8_t lNetworkOptions  ;              // 84 
-  uint8_t lSpare1  ;                      // 85 
+  uint8_t ValveLogOptions  ;              // 85 
   uint8_t lSpare2  ;                      // 86 
   char timeServer[24] ;                   // 110   = {"au.pool.ntp.org\0"}
   char cpassword[16] ;                    // 126
@@ -216,7 +254,8 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   IPAddress IPGateway ;                   // (192,168,0,1)    
   IPAddress IPMask ;                      // (255,255,255,0)   
   IPAddress IPDNS ;                       // (192,168,0,15)   
-} general_housekeeping_stuff_t ;          // computer says it's 136 not 130 ??? is my maths crap ????
+  char servername[32] ;
+} general_housekeeping_stuff_t ;          // computer says it's 224
 
 general_housekeeping_stuff_t ghks ;
 
@@ -237,6 +276,23 @@ typedef struct __attribute__((__packed__)) {
   cnc_v_t      cv[MAX_VALVE] ;   // the most that we can have 
 } cnc_t ; 
 
+typedef struct __attribute__((__packed__)) {     // eeprom stuff
+  int  port;
+  char server[48] ;
+  char user[48] ;
+  char password[48] ;
+  char FROM[48] ;
+  char TO[48] ;
+  char CC[48] ;
+  char BCC[48] ;
+  bool bSecure ;
+  char message[64] ;
+  char subject[64] ;
+  bool bUseEmail ;
+  float LowTankQty ;
+} Email_App_stuff_t ;          
+
+Email_App_stuff_t SMTP;
 
 char cssid[32] = {"Configure_XXXXXXXX\0"} ;
 char *host = "Control_00000000\0";                // overwrite these later with correct chip ID
@@ -266,7 +322,7 @@ long lRebootCode = 0 ;
 uint8_t rtc_status ;
 struct ts tc;  
 bool bPrevConnectionStatus = false;
-unsigned long lTimeNext = 0 ;           // next network retry
+unsigned long lTimeNext = 580000 ;           // next network retry 9 ish minutes from the start
 
 int iTestBoard = 0 ;
 int iTestMode = -1 ; 
@@ -276,12 +332,19 @@ int iTestInc = 1 ;
 int iTestCoil = 0 ;
 int bSaveReq = 0 ;
 int iUploadPos = 0 ;
+int iValveLogTTG = 60 ;
 bool bDoTimeUpdate = false ;
+bool bSendTestEmail = false ;
+bool bValveLogDirty = false ; 
+bool bDoFertUpload = false ;
+bool bManSet = false ;
+bool bBusy = false ;
 long  MyCheckSum ;
 long  MyTestSum ;
 long lTimePrev ;
 long lTimePrev2 ;
 long lMinUpTime = 0 ;
+long lRet_Email = 0 ;
 
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
@@ -345,6 +408,7 @@ int i , k , j = 0;
   pinMode(13,OUTPUT);  // D7 
   pinMode(14,OUTPUT);  // D5
   pinMode(15,OUTPUT);  // D8
+  pinMode(16,OUTPUT);  // 
 
   EEPROM.begin(MAX_EEPROM);
   LoadParamsFromEEPROM(true);  
@@ -362,7 +426,7 @@ int i , k , j = 0;
   display.drawString(63, 16, "Controler");
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);  
-  display.drawString(0, 40, "Copyright (c) 2020");
+  display.drawString(0, 40, "Copyright (c) 2021");
   display.drawString(0, 50, "Dougal Plummer");
   display.setTextAlignment(TEXT_ALIGN_RIGHT);  
   display.drawString(127, 50, String(Toleo));
@@ -380,14 +444,9 @@ int i , k , j = 0;
     vfert[i].lTTG = 0 ;
     vfert[i].bOnOff = false ;
     vfert[i].Flowrate = 0.0 ;  
+    vfert[i].CurrentQtyPrev = efert[i].CurrentQty ;
   }
 
-  for (i = 0 ; i < MAX_FILTER ; i++ ) {
-    vfilter[i].NextCan = 0 ;
-    vfilter[i].bOnOff = false ;
-    vfilter[i].bFlush = false ;
-    vfilter[i].lTTG = 0 ;    
-  }
 
   for (i = 0 ; i < MAX_MCP23017 ; i++ ) {   // initalise all the boards in the expander structure/array
       mcp[i].begin(i);              // initalise if board address as 0x20 -> 0x27
@@ -434,13 +493,14 @@ int i , k , j = 0;
     }
   }
   j = 0 ;
-  delay(1000);
+  ZeroFertQue();
+  delay(500);
 //  Serial.println("Chip ID " + String(ESP.getChipId(), HEX));
 //  Serial.println("Configuring WiFi...");
 
   display.setFont(ArialMT_Plain_10);
 
-  if ( MYVER != ghks.lVersion ) {
+  if (( MYVER != ghks.lVersion ) && ( MYVER_NEW != ghks.lVersion )) {
 //  if ( false ) {
     BackInTheBoxMemory();         // load defaults if blank memory detected but dont save user can still restore from eeprom
     Serial.println("Loading memory defaults...");
@@ -554,7 +614,7 @@ int i , k , j = 0;
   }
 
   server.on("/", handleRoot);
-  server.on("/setup", handleRoot);
+  server.on("/setup", handleSetup);
   server.on("/filt", handleRoot);
   server.on("/fert", handleRoot);
   server.on("/vsss", handleRoot);
@@ -565,8 +625,13 @@ int i , k , j = 0;
   server.on("/stime", handleRoot);
   server.on("/btest", handleRoot);
   server.on("/info", handleInfo);
+  server.on("/email", DisplayEmailSetup);
+  server.on("/fertque", DisplayShowFertQue);
   server.on("/iolocal", ioLocalMap);
   server.on("/eeprom", DisplayEEPROM);
+  server.on("/rtceeprom",DisplayRTCEEPROM);
+  server.on("/valvelog",DisplayValveLog);
+  server.on("/valvelog.csv", HTTP_GET , DisplayValveLog);
   server.on("/backup", HTTP_GET , handleBackup);
   server.on("/backup.txt", HTTP_GET , handleBackup);
   server.on("/backup.txt", HTTP_POST,  handleRoot, handleFileUpload);
@@ -598,6 +663,11 @@ int i , k , j = 0;
 
   randomSeed(now());                       // now we prolly have a good time setting use this to roll the dice for reboot code
   lRebootCode = random(1,+2147483640) ;
+  WDmail.begin();
+  iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ;
+  if ( hasRTC ){
+    ReadValveLogsFromEEPROM();  // read in the valve log data
+  }
 }
 
 //  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
@@ -661,8 +731,9 @@ long lTD ;
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    switch (( rtc_sec >> 1 ) & 0x03){
+    switch (( rtc_sec >> 1 ) % 5){
       case 1:
+        MyIP =  WiFi.localIP() ;  // update to see if has connection                  
         snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
       break;
       case 2:
@@ -670,6 +741,9 @@ long lTD ;
       break;
       case 3:
        snprintf(buff, BUFF_MAX, "%s - %d", ghks.NodeName,ghks.lNodeAddress );   
+      break;
+      case 4:
+       snprintf(buff, BUFF_MAX, "Up Time %d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
       break;
       default:
         snprintf(buff, BUFF_MAX, "%s", cssid );            
@@ -771,10 +845,8 @@ long lTD ;
       OffPol = ((evalve[i].OnOffPolPulse & 0x08  ) >> 3  ) ;
       OnPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x70  ) >> 4  )) ;
       OffPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x07  )  )) ;
-      OnPol = LOW ;
-      OffPol = HIGH ;
-//      OnPulse =  ghks.lPulseTime % 128 ;
-//      OffPulse =  ghks.lPulseTime % 128 ;
+//      OnPol = LOW ;
+//      OffPol = HIGH ;
       if (((vvalve[i].lTTG > 0 )|| (vvalve[i].lATTG > 0))&&(!vvalve[i].bOnOff)){
         vvalve[i].bOnOff = true ;
         board = ( evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ; 
@@ -785,6 +857,8 @@ long lTD ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );           // Pulse On          
 //          Serial.println("On Pulse " + String(OnPulse));
+          OnPol = LOW ;
+          OffPol = HIGH ;
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }        
@@ -799,6 +873,8 @@ long lTD ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
 //          Serial.println("Off Pulse " + String(OffPulse));
+          OnPol = LOW ;
+          OffPol = HIGH ;
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , OffPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }
@@ -826,8 +902,12 @@ long lTD ;
     }     
     fertigation_min();
     fertigation_sec();
-  }                         // end of the once per second stuff
-
+  } else{                        // end of the once per second stuff
+    if ( bSendTestEmail ){
+      SendEmailToClient(-1) ;
+      bSendTestEmail = false ;
+    }
+  }
   if (rtc_hour != hour()){
     if ( !bConfig ) { // ie we have a network
       sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour
@@ -842,6 +922,15 @@ long lTD ;
   if ( rtc_min != minute()){
     bSendCtrlPacket = true ;
     lMinUpTime++ ;
+    if (iValveLogTTG>0){
+      iValveLogTTG -- ;
+    }
+    if ((ghks.ValveLogOptions & 0x80 )!=0 ){
+      UpDateValveLogs();
+    }
+    if ((ghks.ValveLogOptions & 0x40 )!=0 ){
+      bDoFertUpload = true ;
+    }
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( vvalve[i].lATTG > 0 ){
         vvalve[i].lATTG -- ;
@@ -876,6 +965,28 @@ long lTD ;
       processNTPpacket();
     }
   }
+  
+  if ((iValveLogTTG==0)){
+    if ((ghks.ValveLogOptions & 0x7f) != 0 ){ // can switch this off
+      bBusy = false ;
+      for ( i = 0 ; i < MAX_FERT ; i++){  // dont do this if we timing pumps
+        if (vfert[i].bOnOff){
+          bBusy = true ;
+        }
+      }  
+      if (!bBusy){
+        WriteValveLogsToEEPROM() ;
+        iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ; // minutes to the next save
+      }
+    }
+  }
+
+  if ( bDoFertUpload && !IsDoingFert() ) {  // make sure we are not goinf to have a pause when injecting
+    SendFertQueData();
+    bDoFertUpload = false ;
+  }
+  
+  
 
   lRet = ctrludp.parsePacket() ;
   if ( lRet != 0 ) {
@@ -901,7 +1012,7 @@ long lTD ;
 
   if (!WiFi.isConnected())  {
     lTD = (long)lTimeNext-(long) millis() ;
-    if (( abs(lTD)>40000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
+    if (( abs(lTD)>600000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
       lTimeNext = millis() - 1 ;
 /*      Serial.print(millis());
       Serial.print(" ");
@@ -923,7 +1034,7 @@ long lTD ;
       } else {
         WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
       }
-      lTimeNext = millis() + 30000 ;
+      lTimeNext = millis() + 120000 ;
     }
   }else{
     if ( !bPrevConnectionStatus  ){
@@ -935,6 +1046,7 @@ long lTD ;
 
 
 }   //  ################### BOTTOM OF LOOP ########################
+
 
 
 

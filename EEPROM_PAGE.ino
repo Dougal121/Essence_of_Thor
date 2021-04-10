@@ -185,7 +185,7 @@ void handleBackup(){
   uint32_t MyDWord ;
   uint8_t MyByte ;
   long fileSize ;
-  SerialOutParams();
+//  SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
     i = String(server.argName(j)).indexOf("download");
@@ -345,3 +345,7 @@ uint8_t MyByte ;
    }
    return(MyCS);
 }
+
+
+
+

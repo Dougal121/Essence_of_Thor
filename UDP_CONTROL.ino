@@ -4,10 +4,10 @@ int ii ;
 IPAddress ctrlIP ;
 cnc_t  cnc ;  
 
-  Serial.println("CTRL packet called...");
+//  Serial.println("CTRL packet called...");
   if (WiFi.isConnected())  {
 
-    Serial.println("WiFi Available...");
+//    Serial.println("WiFi Available...");
                       
     memset(packetBuffer, 0, sizeof(packetBuffer));    // set all bytes in the buffer to 0
     cnc.cmd = 42 ;
@@ -28,16 +28,15 @@ cnc_t  cnc ;
     cnc.valves = ii ;
     if ( ii > 0 ){                                                                         // there are valves to be uplinked
 //      WiFi.hostByName(address, ghks.RCIP );
-      snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ghks.RCIP[0], ghks.RCIP[1], ghks.RCIP[2], ghks.RCIP[3]);
-      Serial.print("IP address: "+String(ghks.RemotePortCtrl)+" ->  ");
-      Serial.println(buff);
       if  (( ghks.RCIP[0] == 0 ) &&  ( ghks.RCIP[1] == 0 ) && ( ghks.RCIP[2] == 0 ) && ( ghks.RCIP[3] == 0 )){
         Serial.println("No DNS - no point sending NTP to 0.0.0.0 ");      
       }else{
+        snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ghks.RCIP[0], ghks.RCIP[1], ghks.RCIP[2], ghks.RCIP[3]);
+        Serial.print("Sending CTRL packet - IP address: "+String(ghks.RemotePortCtrl)+" ->  ");
+        Serial.println(buff);
         ctrludp.beginPacket( buff, ghks.RemotePortCtrl);                                 // Send control data to the remote port - Broadcast ???
         ctrludp.write((byte *)&cnc, sizeof(cnc));
         ctrludp.endPacket();
-        Serial.println("sending CTRL packet...");
       }
     }
   }
@@ -53,7 +52,7 @@ int ii ;
 byte packetBuffer[16];
 cnc_t  cnc ;  
 
-  Serial.println("Process Uplinked data...");      
+//  Serial.println("Process Uplinked data...");      
   memset(&cnc, 0, sizeof(cnc));
   ctrludp.read((byte *)&cnc, sizeof(cnc)); // read the packet into the buffer
 
@@ -62,10 +61,10 @@ cnc_t  cnc ;
       j = MAX_VALVE ;
       if ( j > cnc.valves ) 
         j = cnc.valves ;
-      Serial.println("Command 42...");      
+//      Serial.println("Command 42...");      
       for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
         ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
-        Serial.println("Valve " + String(ii) + " Uplink status " + String(evalve[ii].Valve));      
+        Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
         if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
           if ( ghks.lNodeAddress == cnc.cv[i].Node ){
             if ( evalve[ii].bEnable ){
@@ -87,4 +86,5 @@ cnc_t  cnc ;
   }
   
 }
+
 
