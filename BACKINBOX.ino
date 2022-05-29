@@ -139,8 +139,8 @@ void BackInTheBoxMemory(){
   }
   sprintf(ghks.nssid,"************\0");  // put your default credentials in here if you wish
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
-  sprintf(ghks.NodeName,"Prickle Patch\0") ;
-  
+
+  sprintf(ghks.NodeName,"GlaDOS\0") ;
 
   sprintf(ghks.cpassword,"\0");
   
@@ -153,12 +153,23 @@ void BackInTheBoxMemory(){
   ghks.localPortCtrl = 8088 ;
   ghks.RemotePortCtrl= 8088 ;
   ghks.lVersion = MYVER ;
+
+  ghks.ADC_Cal_Ofs = 0.0 ;
+  ghks.ADC_Cal_Mul = 1.0 ;
+  ghks.SelfReBoot = 0 ;
+  ghks.lRebootTimeDay = 0 ;
+  sprintf(ghks.ADC_Unit , "\0") ;      // units for display
+  ghks.ADC_Alarm_Mode = 0 ;               // high low etc
+  ghks.ADC_Alarm1 = 0 ;
+  ghks.ADC_Alarm2 = 0 ;                   // 
+  ghks.ADC_Alarm_Delay = 60 ;             // trigger to alarm in seconds  
   
 /*  ghks.RCIP[0] = 192 ;
   ghks.RCIP[1] = 168 ; 
   ghks.RCIP[2] = 2 ;
   ghks.RCIP[3] = 255 ;*/
   sprintf(ghks.RCIP ,"192.168.2.255\0"); 
+  sprintf(ghks.servername,"\0");
   
   ghks.lNetworkOptions = 0 ;     // DHCP 
   ghks.IPStatic[0] = 192 ;
@@ -189,7 +200,10 @@ void BackInTheBoxMemory(){
       elocal.IOPin[i] = i ; 
     }
   }
+  ZeroValveLogsMemory(15);
+  ResetSMTPInfo();
 }
+
 
 
 void LoadParamsFromEEPROM(bool bLoad){
@@ -210,6 +224,9 @@ int eeAddress ;
     ghks.localPort = constrain(ghks.localPort,1,65535);
     ghks.localPortCtrl = constrain(ghks.localPortCtrl,1,65535);
     ghks.RemotePortCtrl = constrain(ghks.RemotePortCtrl,1,65535);
+    if ( ghks.SelfReBoot < 0 )
+      ghks.SelfReBoot = 0 ;
+      
     if ( year(ghks.AutoOff_t) < 2000 ){
        ghks.AutoOff_t = now();
     }
@@ -220,7 +237,17 @@ int eeAddress ;
     }
     ghks.lMaxDisplayValve = constrain(ghks.lMaxDisplayValve,2,MAX_VALVE);
 
-    eeAddress = PROG_BASE ;  // 192 which is 48 * sizeof(float)
+    if (ghks.lVersion  == MYVER_NEW){
+      eeAddress = PROG_BASE_NEW ;  // 192 which is 48 * sizeof(float)      
+    }else{
+      eeAddress = PROG_BASE ;  // 192 which is 48 * sizeof(float)
+    }
+    if ( isnan(ghks.ADC_Cal_Ofs) || isinf(ghks.ADC_Cal_Ofs) ){
+      ghks.ADC_Cal_Ofs = 0.0 ;
+    }
+    if ( isnan(ghks.ADC_Cal_Mul) || isinf(ghks.ADC_Cal_Mul) ){
+      ghks.ADC_Cal_Mul = 1.0 ;
+    }
     EEPROM.get(eeAddress,evalve);
     eeAddress += sizeof(evalve) ;
     EEPROM.get(eeAddress,vp);
@@ -236,16 +263,19 @@ int eeAddress ;
     eeAddress += sizeof(elocal) ;
     EEPROM.get(eeAddress,pn);
     eeAddress += sizeof(pn) ;
+    EEPROM.get(eeAddress,SMTP);
+    eeAddress += sizeof(SMTP) ;
+
     
     Serial.println("Final VPFF EEPROM adress " +String(eeAddress));   
     
   }else{
-    ghks.lVersion  = MYVER ;
+    ghks.lVersion  = MYVER_NEW ;
     EEPROM.put(0,ghks);
     eeAddress = sizeof(ghks) ;
     Serial.println("write - ghks structure size " +String(eeAddress));   
 
-    eeAddress = PROG_BASE ;
+    eeAddress = PROG_BASE_NEW ;
     EEPROM.put(eeAddress,evalve);
     eeAddress += sizeof(evalve) ;
     EEPROM.put(eeAddress,vp);
@@ -260,6 +290,8 @@ int eeAddress ;
     eeAddress += sizeof(elocal) ;
     EEPROM.put(eeAddress,pn);
     eeAddress += sizeof(pn) ;
+    EEPROM.put(eeAddress,SMTP);
+    eeAddress += sizeof(SMTP) ;
     
     Serial.println("Final EEPROM Save adress " +String(eeAddress));   
 
@@ -267,4 +299,5 @@ int eeAddress ;
     bSaveReq = 0 ;
   }
 }
+
 
