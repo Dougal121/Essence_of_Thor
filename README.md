@@ -20,4 +20,4 @@ LocalCPU I/O<br>
 16/05/2020 Restore and backup of users config to PC<br>
 27/09/2020 Fertigation uplink between nodes working - also two more bugs in GUI fixed<br>
 06/04/2021 Valve logging working ... Started on email alarms.<br>
-
+29/05/2022 Alarms working, Self reboot 2 modes working, Pressure alarms.<br>
