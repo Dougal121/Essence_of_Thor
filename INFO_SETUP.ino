@@ -1,3 +1,17 @@
+void IndicateReboot(void){
+    display.clear();
+    display.setTextAlignment(TEXT_ALIGN_CENTER);  
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(63, 20, "AUTO");
+    display.drawString(63, 36, "REBOOT");
+    display.setFont(ArialMT_Plain_10);
+    display.setColor(INVERSE);
+    display.fillRect(0, 0, 128, 11);
+    display.fillRect(0, 53, 128, 11);
+    display.display();    
+    ESP.restart() ;
+}
+
 void handleInfo(){
   int i , ii , iTmp , iX ;
   uint8_t j , k , kk ;
@@ -125,7 +139,7 @@ void handleSetup(){
     i = String(server.argName(j)).indexOf("reboot");
     if (i != -1){  // 
       if (( lRebootCode == String(server.arg(j)).toInt() ) && (lRebootCode>0 )){  // stop the phone browser being a dick and retry resetting !!!!
-        ESP.restart() ;        
+        IndicateReboot ;      
       }
     }
        
@@ -213,7 +227,19 @@ void handleSetup(){
       ghks.ValveLogOptions = ghks.ValveLogOptions & 0xe0 ;
       ghks.ValveLogOptions = ghks.ValveLogOptions | ( String(server.arg(j)).toInt() & 0x1f ) ;
     }        
-
+    i = String(server.argName(j)).indexOf("srbt");
+    if (i != -1){  // 
+      ghks.SelfReBoot =  String(server.arg(j)).toInt()  ;
+      if ((ghks.SelfReBoot < MIN_REBOOT )){
+        if (ghks.SelfReBoot <= 0 ) {
+          ghks.SelfReBoot = 0 ;                  
+        }else{
+          ghks.SelfReBoot = MIN_REBOOT ;
+        }
+      }
+    }        
+ 
+ 
     i = String(server.argName(j)).indexOf("rpctr");
     if (i != -1){  // 
       ghks.RemotePortCtrl = String(server.arg(j)).toInt() ;
@@ -295,7 +321,19 @@ void handleSetup(){
      String(server.arg(j)).toCharArray( ghks.timeServer , sizeof(ghks.timeServer)) ;
     }
 
-    
+    i = String(server.argName(j)).indexOf("lrtd");
+    if (i != -1){  // 
+      lTmp =  String(server.arg(j)).toInt()  ;
+      ghks.lRebootTimeDay = lTmp & 0xfff ;
+    }        
+    for ( k = 0 ; k < 8 ; k++){  // handle all the valve control commands for any and all valves
+      i = String(server.argName(j)).indexOf( "dw" + String(k) );
+      if (i != -1){  // 
+        ghks.lRebootTimeDay |= ( 0x1000 << k ) ;
+      }              
+    }    
+
+  
   }
 
   SendHTTPHeader();   //  ################### START OF THE RESPONSE  ######
@@ -309,7 +347,7 @@ void handleSetup(){
   }
 
   server.sendContent("<form method=post action=" + server.uri() + "><table border=1 title='Node Settings'>");
-  server.sendContent(F("<tr><th>Parameter</th><th>Value</th><th><input type='submit' value='SET'></th></tr>"));
+  server.sendContent(F("<tr><th>Parameter</th><th>Value</th><th align=center><input type='submit' value='SET'></th></tr>"));
 
   server.sendContent(F("<tr><td>Controler Name</td><td align=center>")) ; 
   server.sendContent("<input type='text' name='cname' value='"+String(ghks.NodeName)+"' maxlength=15 size=12></td><td></td></tr>");
@@ -330,7 +368,9 @@ void handleSetup(){
   server.sendContent("<input type='text' name='ndadd' value='" + String(ghks.lNodeAddress) + "' size=12></td><td>"+String(ghks.lNodeAddress & 0xff)+"</td></tr>");
 
   server.sendContent(F("<tr><td>Time Zone</td><td align=center>")) ; 
-  server.sendContent("<input type='text' name='tzone' value='" + String(ghks.fTimeZone,1) + "' size=12></td><td>(Hours)</td></tr>");
+  server.sendContent("<input type='text' name='tzone' value='" + String(ghks.fTimeZone,1) + "' size=12></td><td>(Hours)</td></tr></form>");
+
+  server.sendContent("<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>") ; 
 
   server.sendContent(F("<tr><td>Display Options</td><td align=center>")) ; 
   server.sendContent(F("<select name='disop'>")) ;
@@ -341,11 +381,11 @@ void handleSetup(){
     server.sendContent(F("<option value='0'>0 - Normal")); 
     server.sendContent(F("<option value='1' SELECTED>1 - Invert")); 
   }
-  server.sendContent(F("</select></td><td></td></tr>"));
+  server.sendContent(F("</select></td><td align=center><input type='submit' value='SET'></td></tr>"));
 
   server.sendContent(F("<tr><td>Display Number of Valves</td><td align=center>")) ; 
   server.sendContent("<input type='text' name='maxvn' value='" + String(ghks.lMaxDisplayValve) + "' size=4 maxlength=2></td><td>2 - "+String(MAX_VALVE)+"</td></tr>");
-
+  
   server.sendContent(F("<tr><td>Program Method</td><td align=center>")) ; 
   server.sendContent(F("<select name='prgop'>")) ;
   if (ghks.lProgMethod == 0 ){
@@ -357,6 +397,25 @@ void handleSetup(){
   }
   server.sendContent(F("</select></td><td></td></tr>"));
 
+  server.sendContent(F("<tr><td>Self Reboot Timer</td><td align=center>")) ; 
+  server.sendContent("<input type='text' name='srbt' value='" + String( ghks.SelfReBoot) + "' size=8 maxlength=8></td><td>(min)</td></tr>");
+
+  server.sendContent(F("<tr><td>Reboot Time of Day</td><td align=center>")) ; 
+  server.sendContent("<input type='text' name='lrtd' value='" + String( ghks.lRebootTimeDay & 0xfff ) + "' size=8 maxlength=8></td><td>(HHMM)</td></tr>");
+  message="<tr><td>Reboot Days</td><td colspan=2 align=center>";
+  for (k = 0 ; k < 8 ; k++){      
+    MyColor =  ""   ;  
+    if ( ( ghks.lRebootTimeDay & (0x1000 << k)) != 0 ){
+      MyCheck = F("CHECKED")  ;  
+    }else{
+      MyCheck = "" ;      
+    }
+    message += String(dayarray[k])+ "<input type='checkbox' name='dw" + String(k)+"' "+String(MyCheck)+ ">";    
+  }
+  message+="</td></tr>";
+  server.sendContent(message);
+  message="";  
+
   server.sendContent(F("<tr><td>Valve Logging</td><td align=center>")) ; 
   server.sendContent(F("<select name='vlog'>")) ;
   if (( ghks.ValveLogOptions & 0x80) == 0 ){
@@ -366,7 +425,7 @@ void handleSetup(){
     server.sendContent(F("<option value='0'>0 Off")); 
     server.sendContent(F("<option value='1' SELECTED>1 On")); 
   }
-  server.sendContent("</select></td><td><input type='text' name='vlot' value='" + String((ghks.ValveLogOptions & 0x1f)) + "' size=4 maxlength=2></td></tr></form>");
+  server.sendContent("</select></td><td><input type='text' name='vlot' value='" + String((ghks.ValveLogOptions & 0x1f)) + "' size=4 maxlength=2></td></tr>");
 
   server.sendContent(F("<tr><td>Fertigation Logging</td><td align=center>")) ; 
   server.sendContent(F("<select name='flog'>")) ;
@@ -377,7 +436,7 @@ void handleSetup(){
     server.sendContent(F("<option value='0'>0 Off")); 
     server.sendContent(F("<option value='1' SELECTED>1 On")); 
   }
-  server.sendContent("</select></td><td>.</td></tr></form>");
+  server.sendContent("</select></td><td>.</td></tr>");
 
   server.sendContent(F("<tr><td>Remote Control</td><td align=center>")) ; 
   server.sendContent(F("<select name='rcon'>")) ;
@@ -393,7 +452,7 @@ void handleSetup(){
   server.sendContent("<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>") ; 
 
   server.sendContent(F("<tr><td>Local UDP Port NTP</td><td align=center>")) ; 
-  server.sendContent("<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td><input type='submit' value='SET'></td></tr>");
+  server.sendContent("<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td align=center><input type='submit' value='SET'></td></tr>");
 
   server.sendContent(F("<tr><td>Local UDP Port Control</td><td align=center>")) ; 
   server.sendContent("<input type='text' name='lpctr' value='" + String(ghks.localPortCtrl) + "' size=12></td><td></td></tr>");
@@ -431,7 +490,7 @@ void handleSetup(){
     server.sendContent(F("<option value='0'>0 - DHCP")); 
     server.sendContent(F("<option value='1' SELECTED>1 - Static IP")); 
   }
-  server.sendContent(F("</select></td><td><input type='submit' value='SET'></td></tr>"));
+  server.sendContent(F("</select></td><td align=center><input type='submit' value='SET'></td></tr>"));
   snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.IPStatic[0],ghks.IPStatic[1],ghks.IPStatic[2],ghks.IPStatic[3]);
   server.sendContent(F("<tr><td>Static IP Address</td><td align=center>")) ; 
   server.sendContent("<input type='text' name='staip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr>");

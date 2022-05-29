@@ -17,6 +17,7 @@ String message ;
 }
 
 void SendHTTPHeader(){
+  String strTmp = "" ;
   server.sendHeader(F("Server"),F("ESP8266-on-ice"),false);
   server.sendHeader(F("X-Powered-by"),F("Dougal-1.0"),false);
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -25,7 +26,12 @@ void SendHTTPHeader(){
   message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
   message += F("<meta name=viewport content='width=320, auto inital-scale=1'>");
   message += F("</head><body><html lang='en'><center><h3>");   
-  message += "<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a></h3>";
+  if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
+    strTmp = String(ADC_Value) + " " + String(ghks.ADC_Unit) ;
+  }else{
+    strTmp = "" ;
+  }
+  message += "<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>";
   server.sendContent(message) ;         
 }
 
@@ -96,7 +102,7 @@ void handleRoot() {
   boolean bDefault = true ;
 //  int td[6];
   long lTmp ; 
-  String MyCheck , MyColor , MyNum , MyCheck2 ;
+  String MyCheck , MyColor , MyNum , MyCheck2 , MyCheck3 ;
   byte mac[6];
   String message ;
 
@@ -184,12 +190,15 @@ void handleRoot() {
         case 121:
           ResetSMTPInfo();
         break;
+        case 669:
+          bSentADCAlarmEmail = false ;
+        break;
       }  
     }
     i = String(server.argName(j)).indexOf("reboot");
     if (i != -1){  // 
       if (( lRebootCode == String(server.arg(j)).toInt() ) && (lRebootCode>0 )){  // stop the phone browser being a dick and retry resetting !!!!
-        ESP.restart() ;        
+         IndicateReboot() ;        
       }
     }
     for ( ii = 0 ; ii < MAX_FILTER ; ii++){  // handle all the filter control arguments
@@ -348,6 +357,13 @@ void handleRoot() {
         evalve[ii].TypeMaster = 0x3f & String(server.arg(j)).toInt()   ;
 //        Serial.println("TypeMaster C " + String(evalve[ii].TypeMaster) );  
       }        
+      i = String(server.argName(j)).indexOf("vtya" + MyNum);
+      if (i != -1){  // valve type / domestic ? 
+        if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
+          evalve[ii].TypeMaster |= ( 0x200 )  ;
+//          Serial.println("TypeMaster M " + String(evalve[ii].TypeMaster) );  
+        }
+      }                
       i = String(server.argName(j)).indexOf("vtyd" + MyNum);
       if (i != -1){  // valve type / domestic ? 
         if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
@@ -930,6 +946,13 @@ void handleRoot() {
     }
     message = F("</table>") ;
     server.sendContent(message) ;
+    message = F("<br><b>ADC Input Status</b><br><table border=1 title='ADC Status'>") ;
+    message += "<tr><td>Raw </td><td>" + String(ADC_Raw) + "</td><td>(Counts)</td></tr>"  ;
+    message += "<tr><td>Cooked </td><td>" + String(ADC_Value) + "</td><td>("+ String(ghks.ADC_Unit) + ")</td></tr>"  ;
+    message += F("</table>") ;
+    server.sendContent(message) ;
+    
+    server.sendContent(message) ;
   }
   
   if (bDefault) {     // #####################################   default valve control and setup  ##############################################
@@ -939,8 +962,8 @@ void handleRoot() {
     if (bExtraValve) {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
-        message += F("<th colspan=4>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
-        message += F("<tr><th>Cascade</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
+        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
+        message += F("<tr><th>Cascade</th><th>AO</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
         message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;
@@ -994,6 +1017,11 @@ void handleRoot() {
       }
       if (bExtraValve) {
         if (iPage == 1 ){
+          if (( evalve[i].TypeMaster & 0x200 ) != 0 ){
+            MyCheck3 = F(" CHECKED") ;
+          }else{
+            MyCheck3 = "" ;       
+          }
           if (( evalve[i].TypeMaster & 0x100 ) != 0 ){
             MyCheck2 = F(" CHECKED") ;
           }else{
@@ -1010,7 +1038,7 @@ void handleRoot() {
             MyColor = "" ;       
           }
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='3'><input type='hidden' name='vnum"+MyNum+"' value='"+String(i)+"'><td><input type='text' name='vdes"+MyNum+"' value='" + String(evalve[i].description) + "' maxlength=7 size=8></td>" ; 
-          message += "<td><input type='text' name='vmas"+MyNum+"' value='" + String((evalve[i].TypeMaster & 0x3f )) + "' maxlength=2 size=2></td><td><input type='checkbox' name='vtyd"+MyNum+"'"+ String(MyCheck2) + "></td><td><input type='checkbox' name='vtym"+MyNum+"'"+ String(MyCheck) + "></td><td><input type='checkbox' name='vtyf"+MyNum+"'"+ String(MyColor) + "></td>" ;
+          message += "<td><input type='text' name='vmas"+MyNum+"' value='" + String((evalve[i].TypeMaster & 0x3f )) + "' maxlength=2 size=2></td><td><input type='checkbox' name='vtya"+MyNum+"'"+ String(MyCheck3) + "></td><td><input type='checkbox' name='vtyd"+MyNum+"'"+ String(MyCheck2) + "></td><td><input type='checkbox' name='vtym"+MyNum+"'"+ String(MyCheck) + "></td><td><input type='checkbox' name='vtyf"+MyNum+"'"+ String(MyColor) + "></td>" ;
           message += "<td><input type='text' name='ncom"+MyNum+"' value='" + String(evalve[i].Valve & 0x7f) + "' maxlength=3 size=2></td>";
           if (( evalve[i].Valve & 0xf0 ) != 0 ){
             MyColor = F(" CHECKED") ;

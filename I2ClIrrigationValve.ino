@@ -36,6 +36,7 @@
 uEEPROMLib rtceeprom(0x57);
 ESPMail WDmail;
 
+#define MIN_REBOOT  720             //   720   12 hours normally      10 min for testing
 #define BUFF_MAX 128
 /* Display settings */
 #define minRow       0              /* default =   0 */
@@ -50,7 +51,7 @@ ESPMail WDmail;
 #define MYVER 0x12345679     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 #define MYVER_NEW 0x12345680     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 
-const int MAX_EEPROM = 3000 ;  // changes from 2000 circa dec 2020
+const int MAX_EEPROM = 4000 ;  // changes from 2000 circa dec 2020   then from 3000 circa Mar 2022
 //const byte SETPMODE_PIN = D8 ; 
 //const byte FLASH_BTN = D3 ;    // GPIO 0 = FLASH BUTTON 
 //const byte SCOPE_PIN = D7 ;
@@ -91,7 +92,7 @@ SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  --
 Adafruit_MCP23017 mcp[MAX_MCP23017] ;
 
 typedef struct __attribute__((__packed__)) {             // permanent record
-  int16_t TypeMaster;        // NoFert 0-1 normal-nofert Type 0-1 normal=master 0-1 nofeedbak-feedback 0-1 and Master valve ID 0-63   2 bits + 6 bits
+  int16_t TypeMaster;        // Always_On 0-1 normal-never_offline Domesitic_Water 0-1 normal-nofert Valve_Type 0-1 normal=master FeedBack 0-1 nofeedbak-feedback  and Master valve ID 0-63   3 bits + 6 bits
   uint8_t OnCoilBoardBit;    // 16 boards + 16 Outputs   4 + 4 bits
   uint8_t OffCoilBoardBit;   // 16 boards + 16 Outputs  4 + 4 bits
   uint8_t OnOffPolPulse ;    // 4 bits on 4 bits off pulse and polarity ie 1 + 3 x 50 ms + 50ms base 
@@ -255,9 +256,18 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   IPAddress IPMask ;                      // (255,255,255,0)   
   IPAddress IPDNS ;                       // (192,168,0,15)   
   char servername[32] ;
+  long SelfReBoot ;
+  long lRebootTimeDay ;
+  float ADC_Cal_Mul ;
+  float ADC_Cal_Ofs ;
+  char  ADC_Unit[5] ;                     // units for display
+  uint8_t  ADC_Alarm_Mode ;               // high low etc   0x80 Contious enable 0x40 Master Valve Only Enable  0x20  Alram 2 master  0x10 Alarm 1 master     0x02 Alarm 1 high   0x01 Alarm 2 high
+  float ADC_Alarm1 ;
+  float ADC_Alarm2 ;                      // 
+  uint16_t  ADC_Alarm_Delay ;             // trigger to alarm in seconds
 } general_housekeeping_stuff_t ;          // computer says it's 224
 
-general_housekeeping_stuff_t ghks ;
+general_housekeeping_stuff_t ghks ;   // we reserver 320 for this ?
 
 typedef struct __attribute__((__packed__)) {
   int16_t lATTG  ;            // programed (automatic) minutes
@@ -290,6 +300,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char subject[64] ;
   bool bUseEmail ;
   float LowTankQty ;
+  bool bSPARE ; 
 } Email_App_stuff_t ;          
 
 Email_App_stuff_t SMTP;
@@ -337,6 +348,7 @@ bool bDoTimeUpdate = false ;
 bool bSendTestEmail = false ;
 bool bValveLogDirty = false ; 
 bool bDoFertUpload = false ;
+bool bValveActive = false ; 
 bool bManSet = false ;
 bool bBusy = false ;
 long  MyCheckSum ;
@@ -345,7 +357,11 @@ long lTimePrev ;
 long lTimePrev2 ;
 long lMinUpTime = 0 ;
 long lRet_Email = 0 ;
-
+float ADC_Value = 0 ;
+int   ADC_Raw = 0 ; 
+bool  bSentADCAlarmEmail = false ;
+long ADC_Trigger = 0 ;
+int   iAutoResetStatus = 0 ; 
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
 
@@ -387,6 +403,8 @@ int NumberOK (float target) {
   return (tmp);
 }
 */
+
+
 
 
 
@@ -626,6 +644,7 @@ int i , k , j = 0;
   server.on("/btest", handleRoot);
   server.on("/info", handleInfo);
   server.on("/email", DisplayEmailSetup);
+//  server.on("/alarm", DisplayAlarmSetup);
   server.on("/fertque", DisplayShowFertQue);
   server.on("/iolocal", ioLocalMap);
   server.on("/eeprom", DisplayEEPROM);
@@ -685,6 +704,12 @@ bool bSendCtrlPacket ;
 bool bDirty = false ;
 bool bDirty2 = false ;
 long lTD ;
+bool bTrigger = false ;
+int iMailMsg = 0 ;
+int iHM = 0 ; 
+int iDOW = 0 ;
+int iRebootTime = 0 ;
+time_t NowTime ;
   
   server.handleClient();
   OTAWebServer.handleClient();
@@ -731,7 +756,8 @@ long lTD ;
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    switch (( rtc_sec >> 1 ) % 5){
+    i = ( rtc_sec >> 1 ) % 6 ;
+    switch (i){
       case 1:
         MyIP =  WiFi.localIP() ;  // update to see if has connection                  
         snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
@@ -745,25 +771,54 @@ long lTD ;
       case 4:
        snprintf(buff, BUFF_MAX, "Up Time %d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
       break;
+      case 5:
+        switch (iAutoResetStatus){
+          case -1: snprintf(buff, BUFF_MAX, "Auto Reboot %d",( ghks.lRebootTimeDay & 0xfff )); break ;
+          case -2: snprintf(buff, BUFF_MAX, "Auto Reboot Today %d",( ghks.lRebootTimeDay & 0xfff )); break ;
+          case -3: snprintf(buff, BUFF_MAX, "REBOOT IN ONE MINUTE"); break ;
+          case 1: snprintf(buff, BUFF_MAX, "Reboot interval %d min", ghks.SelfReBoot ); break ;
+          case 2: snprintf(buff, BUFF_MAX, "Auto Reboot in %d min", (ghks.SelfReBoot - lMinUpTime )); break ;
+          case 3: snprintf(buff, BUFF_MAX, "REBOOT IN ONE MINUTE"); break ;
+          default: snprintf(buff, BUFF_MAX, "Auto Reboot OFF") ; break;
+        }
+      break;
       default:
         snprintf(buff, BUFF_MAX, "%s", cssid );            
       break;
     }
     display.drawString(64 , 53 ,  String(buff) );
+    if (( abs(iAutoResetStatus) == 3 ) && (i == 5)) {
+       display.setColor(INVERSE);
+       display.fillRect(0, 53, 128, 11);            
+    }
+    if ( iTestMode == -1 ){   // test mode uses this area as well so dont display in test mode
+      display.setTextAlignment(TEXT_ALIGN_RIGHT);
+      display.drawString(128 , 33 ,  String(ADC_Value,1)+ String(" (") +String(ghks.ADC_Unit)+ String(" )") );
+      if ( bSentADCAlarmEmail ){
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(128 , 43 ,  String("*") );      
+      }
+      if ( ADC_Trigger > 0 ) {
+         display.drawString(128 , 43 , String(iMailMsg) + "-" + String(ADC_Trigger) + " / " + String(ghks.ADC_Alarm_Delay) );
+         display.setColor(INVERSE);
+         display.fillRect(64, 33, 64, 21);
+      }
+    }
     if (ghks.lProgMethod == 0 ){
       UpdateATTG() ;                                          // update the program switching Time To Go timers
     }else{
       UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
     }      
-    for (i = 0 ; i < MAX_VALVE ; i++ ) {              // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
-      if (( evalve[i].TypeMaster & 0x80 ) != 0 ){      // This is the master valve check
+    bValveActive = false ;
+    for (i = 0 ; i < MAX_VALVE ; i++ ) {                      // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
+      if (( evalve[i].TypeMaster & 0x80 ) != 0 ){             // This is the master valve check
         vvalve[i].lTTG = 0 ;
         if ( evalve[i].Node != 0 ){
            evalve[i].Fertigate = 0 ;
            evalve[i].Flowrate = 0 ;
         }
-        for (k = 0 ; k < MAX_VALVE ; k++ ) {          // scan the list again  
-          j = ( evalve[k].TypeMaster & 0x3f ) - 1 ;        // look for a subordinate valve
+        for (k = 0 ; k < MAX_VALVE ; k++ ) {                  // scan the list again  
+          j = ( evalve[k].TypeMaster & 0x3f ) - 1 ;           // look for a subordinate valve
           if (j == i){
             if ( evalve[i].bEnable ){
               if ( vvalve[i].lATTG < vvalve[k].lATTG ){
@@ -788,6 +843,7 @@ long lTD ;
         y = 23 ;       
       }  
       if ( vvalve[i].bOnOff ){   // valve on
+        bValveActive = true ;
         if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){  // look if it has feedback
           display.drawCircle(x+3, y, 3);
           display.drawLine(x+1, y - 2, x+5, y + 2);
@@ -902,6 +958,93 @@ long lTD ;
     }     
     fertigation_min();
     fertigation_sec();
+    
+    ADC_Raw = analogRead(A0) ;
+    ADC_Value = ((ghks.ADC_Cal_Mul * ADC_Raw / 1023 ) ) + ghks.ADC_Cal_Ofs ;
+    if (( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ) {
+      bTrigger = false ;
+      if ((( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ) || ( (( ghks.ADC_Alarm_Mode & 0x02 ) == 0x02 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x04 ) == 0x04 ) && !bValveActive ))  {    // alarm 1 on 
+        if (( ghks.ADC_Alarm_Mode & 0x01 ) != 0 ){ // looking for a high alarm else jump down for a low on
+          if ( ADC_Value > ghks.ADC_Alarm1 ) {     // high alarm test 
+            bTrigger = true ;  
+            if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){  // this is the always case
+                iMailMsg = 5 ;              
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 9 ;                 
+              }else{
+                iMailMsg = 13 ;
+              }
+            }
+          }          
+        }else{
+          if ( ADC_Value < ghks.ADC_Alarm1 ) { // low alarm test
+            bTrigger = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){   // this is the always case
+                iMailMsg = 7 ;                                
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 11 ;                  
+              }else{
+                iMailMsg = 15 ;                  
+              }
+            }
+          }          
+        }
+      }
+      if ((( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ) || ( (( ghks.ADC_Alarm_Mode & 0x10 ) == 0x10 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x20 ) == 0x20 ) && !bValveActive ))  {    // alarm 2 on 
+        if (( ghks.ADC_Alarm_Mode & 0x08 ) != 0 ){   // looking for a high alarm on number 2 else jump down for the low one
+          if ( ADC_Value > ghks.ADC_Alarm2 ) {       //  check the level
+            bTrigger = true ;      
+            if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){  // this is the always active
+                iMailMsg = 6 ;                                
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 10 ;                  
+              }else{
+                iMailMsg = 14 ;                  
+              }
+            }
+          }          
+        }else{
+          if ( ADC_Value < ghks.ADC_Alarm2 ) {        // check the low alarm 
+            bTrigger = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){   // this is the always active
+                iMailMsg = 8 ;     // alarm 2 always                           
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 12 ;   // alarm 2 valve on               
+              }else{
+                iMailMsg = 16 ;   // alarm 2 valve off               
+              }
+            }
+          }          
+        }
+      }
+      
+      if ( bTrigger ) {
+        if (!bSentADCAlarmEmail) {
+          ADC_Trigger++ ;           
+        }               
+      }else{
+        ADC_Trigger = 0 ;      
+        iMailMsg = 0 ;
+      }
+      if (ADC_Trigger > ghks.ADC_Alarm_Delay) {
+        if ( !bSentADCAlarmEmail ){
+          if ( iMailMsg != 0 ){
+            SendEmailToClient(iMailMsg) ;
+          }
+          bSentADCAlarmEmail = true ;
+        }  
+      }
+    }else{
+      ADC_Trigger = 0 ;
+      iMailMsg = 0 ;
+      bSentADCAlarmEmail = false ;
+    }
+
+    
   } else{                        // end of the once per second stuff
     if ( bSendTestEmail ){
       SendEmailToClient(-1) ;
@@ -909,6 +1052,10 @@ long lTD ;
     }
   }
   if (rtc_hour != hour()){
+    if (( bSentADCAlarmEmail ) && ( hour() == 0 )){
+      bSentADCAlarmEmail = false ;
+      ADC_Trigger = 0 ; 
+    }
     if ( !bConfig ) { // ie we have a network
       sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour
     }else{
@@ -922,6 +1069,58 @@ long lTD ;
   if ( rtc_min != minute()){
     bSendCtrlPacket = true ;
     lMinUpTime++ ;
+    if (( lMinUpTime == 3 ) && SMTP.bUseEmail ) {
+      SendEmailToClient(-2);                         // email that reboot just occureed  
+    }
+    
+    iAutoResetStatus = 0 ;
+    if (  ghks.SelfReBoot > 0 ) {
+      iAutoResetStatus = 1 ;
+      if ( lMinUpTime > MIN_REBOOT ) {
+        iAutoResetStatus = 2 ;
+        if ( lMinUpTime == ghks.SelfReBoot  ) {
+          iAutoResetStatus = 3 ;
+          if ( SMTP.bUseEmail ){
+            SendEmailToClient(-3);                           // email intention to reboot on minute before you pull the pin
+          }
+        }
+        if ( lMinUpTime > ghks.SelfReBoot ) {
+          IndicateReboot() ;
+        }
+      }
+    }
+    NowTime = now() + 60 ;
+    i = ( hour(NowTime) * 100 ) + minute(NowTime) ;
+    iHM = ( hour() * 100 ) + minute() ;
+    iRebootTime = ghks.lRebootTimeDay & 0xfff ;
+    iDOW = dayOfWeek(now()) ;
+    if (( ghks.lRebootTimeDay & 0x80000 ) != 0 ) {   // enabled and the right day
+      iAutoResetStatus = -1 ;
+      if (( ghks.lRebootTimeDay & ( 0x1000 << ( iDOW - 1))) != 0 )   {
+        iAutoResetStatus = -2 ;
+        if ( lMinUpTime > MIN_REBOOT ) { 
+          if (iRebootTime == 0 ){
+            if ( iHM == 2359 ) {
+              iAutoResetStatus = 3 ;
+              if (SMTP.bUseEmail){
+                SendEmailToClient(-3);                         // email intention to reboot on minute before you pull the pin
+              }
+            }         
+          }else{
+            if (i == iRebootTime ){
+              iAutoResetStatus = -3 ;
+              if (SMTP.bUseEmail){
+                SendEmailToClient(-3);                         // email intention to reboot on minute before you pull the pin
+              }
+            }          
+          }
+          if (iRebootTime == iHM ){
+            IndicateReboot() ;
+          }
+        }
+      }
+    }
+    
     if (iValveLogTTG>0){
       iValveLogTTG -- ;
     }
@@ -1046,8 +1245,6 @@ long lTD ;
 
 
 }   //  ################### BOTTOM OF LOOP ########################
-
-
 
 
 
