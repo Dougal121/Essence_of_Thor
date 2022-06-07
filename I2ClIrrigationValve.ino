@@ -1,10 +1,10 @@
 /*
-    This project is a distillation of "Project Thor"  which started in 2008
+    This code is a distillation of "Project Thor"  which started in 2008
     So in that vein you can expect it's lost a little body but the conceptual "active constituents" are present in a concerntrated form.
 
     The code is designed to work with/in multiple configurations and hardware based around the ESP8266.
 
-    It was originally fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
+    This version was originally fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
     Newer copies can be found at https://github.com/Dougal121/Essence_of_Thor
 
     The idea is to provide low cost high tech fertigation/irrigation control for real world farming which is scalable from small to medium size farms (0.1 to 100 Ha)
@@ -960,7 +960,7 @@ time_t NowTime ;
     fertigation_sec();
     
     ADC_Raw = analogRead(A0) ;
-    ADC_Value = ((ghks.ADC_Cal_Mul * ADC_Raw / 1023 ) ) + ghks.ADC_Cal_Ofs ;
+    ADC_Value = ((ghks.ADC_Cal_Mul * (( 1.0 * ADC_Raw ) + ghks.ADC_Cal_Ofs ) / 1023 ) )  ;
     if (( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ) {
       bTrigger = false ;
       if ((( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ) || ( (( ghks.ADC_Alarm_Mode & 0x02 ) == 0x02 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x04 ) == 0x04 ) && !bValveActive ))  {    // alarm 1 on 

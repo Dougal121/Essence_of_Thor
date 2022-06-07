@@ -435,7 +435,12 @@ void handleRoot() {
       }        
       i = String(server.argName(j)).indexOf("vpon" + MyNum);
       if (i != -1){  // on valve polatity and pulse time
-        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x0F ) | ( 0xF0 & (( String(server.arg(j)).toInt()) << 4 ))  ;
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x8f ) | ( 0x70 & (( String(server.arg(j)).toInt()) << 4 ))  ;
+//        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
+      }        
+      i = String(server.argName(j)).indexOf("vppon" + MyNum);
+      if (i != -1){  // on valve polatity and pulse time
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x7f ) | ( 0x80 & (( String(server.arg(j)).toInt()) << 7 ))  ;
 //        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
       }        
       i = String(server.argName(j)).indexOf("vaon" + MyNum);
@@ -451,7 +456,12 @@ void handleRoot() {
       }        
       i = String(server.argName(j)).indexOf("vpof" + MyNum);
       if (i != -1){  // off valve polatity and pulse time
-        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF0 ) | ( 0x0f &  String(server.arg(j)).toInt())  ;
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF8 ) | ( 0x07 &  String(server.arg(j)).toInt())  ;
+//        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
+      }        
+      i = String(server.argName(j)).indexOf("vppof" + MyNum);
+      if (i != -1){  // off valve polatity and pulse time
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF7 ) | ( 0x08 &  (String(server.arg(j)).toInt()<<3))  ;
 //        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
       }        
       i = String(server.argName(j)).indexOf("vaof" + MyNum);
@@ -962,8 +972,8 @@ void handleRoot() {
     if (bExtraValve) {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
-        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
-        message += F("<tr><th>Cascade</th><th>AO</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
+        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=4>On</th><th colspan=4>Off</th></tr>");      
+        message += F("<tr><th title='Cascade to Master Valve Number'>Cascade</th><th title='Always On - ignore global off until dates'>AO</th><th title='Domestic Water - Only activate if clear of fertiliser'>DW</th><th title='This is a master valve'>MV</th><th title='Feeback Circuit Present'>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th></tr>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
         message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;
@@ -1048,8 +1058,18 @@ void handleRoot() {
           message += "<td><input type='checkbox' name='ncul"+MyNum+"'"+ String(MyColor) + "></td>";
           message += "<td><input type='text' name='ncon"+MyNum+"' value='" + String(evalve[i].Node) + "' maxlength=3 size=2></td>";
           message += "<td><input type='text' name='nflo"+MyNum+"' value='" + String(evalve[i].Flowrate) + "' maxlength=5 size=2></td>";
-          message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
-          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x0f )) + "' maxlength=3 size=2></td>" ; 
+          if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+            MyCheck = "<select name='vppon"+MyNum+"'><option value='0'>Pos<option value='1' SELECTED>Neg</select>" ;
+          }else{
+            MyCheck = "<select name='vppon"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
+          }
+          message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=2 size=2></td><td>"+ MyCheck+"</td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x70 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
+          if ((evalve[i].OnOffPolPulse & 0x08) != 0 ){
+            MyCheck = "<select name='vppof"+MyNum+"'><option value='0'>Pos<option value='1' SELECTED>Neg</select>" ;
+          }else{
+            MyCheck = "<select name='vppof"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
+          }
+          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td>"+ MyCheck+"</td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x07 )) + "' maxlength=3 size=2></td>" ; 
         }else{
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='4'><td><input type='text' name='vfbt"+MyNum+"' value='" + String(evalve[i].FeedbackBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vfad"+MyNum+"' value='" + String((evalve[i].FeedbackBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
           for (k = 0 ; ( k < 8 ) && ( k < MAX_FERT ) ; k++){      

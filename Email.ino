@@ -417,9 +417,10 @@ void DisplayEmailSetup() {
   message += "<tr><form method=post action=" + server.uri() + "><td>SMTP Secure<input type='hidden' name='smbz' value='0'></td><td align=center><input type='checkbox' name='smbs' " + String(MyCheck)+ "></td><td>.</td><td><input type='submit' value='SET'></td></form></tr>" ;
   message += "<tr><td>Last Email Status</td><td>"+String(lRet_Email)+"</td><td colspan=2>.</td></tr>" ;
   message += "<tr></td><td colspan=4>.</td></tr>" ;
-  message += "<tr><form method=post action=" + server.uri() + "><td>ADC Multiplier</td><td align=center><input type='text' name='adcm' value='"+String(ghks.ADC_Cal_Mul)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>" ;
-  message += "<tr><form method=post action=" + server.uri() + "><td>ADC Offset</td><td align=center><input type='text' name='adco' value='"+String(ghks.ADC_Cal_Ofs)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td>ADC Multiplier</td><td align=center><input title='The number of S.I. units per input Volt x 3.2' type='text' name='adcm' value='"+String(ghks.ADC_Cal_Mul)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td>ADC Offset</td><td align=center><input title='The easy way to do this is use the zero cal button below' type='text' name='adco' value='"+String(ghks.ADC_Cal_Ofs)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>" ;
   message += "<tr><form method=post action=" + server.uri() + "><td>ADC SI Units</td><td align=center><input type='text' name='allu' value='"+String(ghks.ADC_Unit)+"' size=30 maxlength=5></td><td></td><td><input type='submit' value='SET'></td></form></tr>" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td>ADC RAW <b> "+String(ADC_Raw)+" </td><td>ADC Scaled Value <b> "+String(ADC_Value,1)+" </td><td colspan=2><input type='hidden' name='adco' value='"+String(-1.0*ADC_Raw)+"'><input title='Setup the transducer for Zero physical input quantity then press this button to calibrate the zero point on computer' type='submit' value='DO ZERO CAL'></td></tr>" ;
 
   message += "<tr><form method=post action=" + server.uri() + "><td>Master Alarm Enable</td><td> <select name='almmc'>" ;
   switch ( ghks.ADC_Alarm_Mode & 0x80 ){
