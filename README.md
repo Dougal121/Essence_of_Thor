@@ -22,3 +22,5 @@ LocalCPU I/O<br>
 06/04/2021 Valve logging working ... Started on email alarms.<br>
 29/05/2022 Alarms working, Self reboot 2 modes working, Pressure alarms. AO valve type for always on programs<br>
 07/06/2022 Testing and debugging with actual pressure transducer, added new valve type that always runs it's program(no tempary offline)<br>
+27/06/2022 All of the above running in the feild. Endurance testing in progress....<br>
+
