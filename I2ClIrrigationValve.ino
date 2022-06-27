@@ -843,7 +843,9 @@ time_t NowTime ;
         y = 23 ;       
       }  
       if ( vvalve[i].bOnOff ){   // valve on
-        bValveActive = true ;
+        if (( evalve[i].TypeMaster & 0x80 ) != 0x00  ){
+          bValveActive = true ;
+        }  
         if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){  // look if it has feedback
           display.drawCircle(x+3, y, 3);
           display.drawLine(x+1, y - 2, x+5, y + 2);
@@ -925,7 +927,7 @@ time_t NowTime ;
         board = 0 ;
         if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {
 //          IOEXP[board].write( evalve[i].OffCoilBoardBit , !OnPol );                      // hold off
-          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , 0 ) ;
+          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usfull
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
 //          Serial.println("Off Pulse " + String(OffPulse));
@@ -1069,7 +1071,7 @@ time_t NowTime ;
   if ( rtc_min != minute()){
     bSendCtrlPacket = true ;
     lMinUpTime++ ;
-    if (( lMinUpTime == 3 ) && SMTP.bUseEmail ) {
+    if (( lMinUpTime == 5 ) && SMTP.bUseEmail ) {
       SendEmailToClient(-2);                         // email that reboot just occureed  
     }
     

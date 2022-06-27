@@ -43,6 +43,9 @@ String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href=
   message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br>");
   message += F("<a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br>");
   message += F("<a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>") ;     
+  server.sendContent(message) ;  
+  message = "" ;       
+
   message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>";
 //  message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>");
   message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>");
@@ -54,6 +57,8 @@ String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href=
   message += F("<a href='/btest'>Relay Board Test</a><br>");
   message += F("<a href='/vsss'>view volatile memory structures</a><br>");
   message += F("<a href='/fertque'>view fertigation data que</a><br>");
+  server.sendContent(message) ;  
+  message = "" ;       
   
   if (!WiFi.isConnected()) {
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
@@ -65,9 +70,9 @@ String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href=
   message += "<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br><br>";  
   snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
   message += "Computer Uptime <b>"+String(buff)+"</b> (day:hr:min) <br>" ;
-  
-  server.sendContent(F("</body></html>\r\n"));
-  server.sendContent(message) ;         
+  message += F("</body></html>\r\n");
+  server.sendContent(message) ;  
+  message = "" ;       
 }
 
 
@@ -1027,22 +1032,22 @@ void handleRoot() {
       }
       if (bExtraValve) {
         if (iPage == 1 ){
-          if (( evalve[i].TypeMaster & 0x200 ) != 0 ){
+          if (( evalve[i].TypeMaster & 0x200 ) != 0 ){   // always on program valve
             MyCheck3 = F(" CHECKED") ;
           }else{
             MyCheck3 = "" ;       
           }
-          if (( evalve[i].TypeMaster & 0x100 ) != 0 ){
+          if (( evalve[i].TypeMaster & 0x100 ) != 0 ){  // domestic water
             MyCheck2 = F(" CHECKED") ;
           }else{
             MyCheck2 = "" ;       
           }
-          if (( evalve[i].TypeMaster & 0x80 ) != 0 ){
+          if (( evalve[i].TypeMaster & 0x80 ) != 0 ){  // master valve
             MyCheck = F(" CHECKED") ;
           }else{
             MyCheck = "" ;       
           }
-          if (( evalve[i].TypeMaster & 0x40 ) != 0 ){
+          if (( evalve[i].TypeMaster & 0x40 ) != 0 ){   // feedback
             MyColor = F(" CHECKED") ;
           }else{
             MyColor = "" ;       
@@ -1064,12 +1069,25 @@ void handleRoot() {
             MyCheck = "<select name='vppon"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
           }
           message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=2 size=2></td><td>"+ MyCheck+"</td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x70 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
-          if ((evalve[i].OnOffPolPulse & 0x08) != 0 ){
+/*          if ((evalve[i].OnOffPolPulse & 0x08) != 0 ){
             MyCheck = "<select name='vppof"+MyNum+"'><option value='0'>Pos<option value='1' SELECTED>Neg</select>" ;
           }else{
             MyCheck = "<select name='vppof"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
+          }*/
+          if (evalve[i].OnCoilBoardBit == evalve[i].OffCoilBoardBit ) { // if these are the same just show polarity as reversed
+            if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+              MyCheck = "Pos" ;
+            }else{
+              MyCheck = "Neg" ;
+            }            
+          }else{
+            if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+              MyCheck = "Neg" ;
+            }else{
+              MyCheck = "Pos" ;
+            }            
           }
-          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td>"+ MyCheck+"</td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x07 )) + "' maxlength=3 size=2></td>" ; 
+          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td>"+MyCheck+"</td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x07 )) + "' maxlength=3 size=2></td>" ; 
         }else{
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='4'><td><input type='text' name='vfbt"+MyNum+"' value='" + String(evalve[i].FeedbackBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vfad"+MyNum+"' value='" + String((evalve[i].FeedbackBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
           for (k = 0 ; ( k < 8 ) && ( k < MAX_FERT ) ; k++){      
