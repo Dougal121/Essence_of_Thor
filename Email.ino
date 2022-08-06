@@ -21,7 +21,7 @@ bool bRoach = false ;
                 i = MAX_FERT ;
             break;   
             case -2:  // bootup/reboot
-                snprintf(csTemp,MESSAGE_MAX,"%s - Booted up or Rebooted 5 minutes ago\0",ghks.NodeName  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - Booted up or Rebooted 15 minutes ago\0",ghks.NodeName  )  ;  
                 i = MAX_FERT ;
             break;   
             case -1:  // test

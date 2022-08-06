@@ -1071,7 +1071,7 @@ time_t NowTime ;
   if ( rtc_min != minute()){
     bSendCtrlPacket = true ;
     lMinUpTime++ ;
-    if (( lMinUpTime == 5 ) && SMTP.bUseEmail ) {
+    if (( lMinUpTime == 15 ) && SMTP.bUseEmail ) {
       SendEmailToClient(-2);                         // email that reboot just occureed  
     }
     
