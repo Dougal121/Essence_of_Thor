@@ -23,4 +23,4 @@ LocalCPU I/O<br>
 29/05/2022 Alarms working, Self reboot 2 modes working, Pressure alarms. AO valve type for always on programs<br>
 07/06/2022 Testing and debugging with actual pressure transducer, added new valve type that always runs it's program(no tempary offline)<br>
 27/06/2022 All of the above running in the feild. Endurance testing in progress....<br>
-
+02/10/2022 Field testing going well minor updates to pages to trak a maybe problem with WiFi.
