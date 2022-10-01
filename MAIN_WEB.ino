@@ -22,41 +22,41 @@ void SendHTTPHeader(){
   server.sendHeader(F("X-Powered-by"),F("Dougal-1.0"),false);
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
-  String message = F("<!DOCTYPE HTML>");
-  message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
-  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>");
-  message += F("</head><body><html lang='en'><center><h3>");   
+  String message = F("<!DOCTYPE HTML>\r\n");
+  message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>\r\n";
+  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>\r\n");
+  message += F("</head><body><html lang='en'><center><h3>\r\n");   
   if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
     strTmp = String(ADC_Value) + " " + String(ghks.ADC_Unit) ;
   }else{
     strTmp = "" ;
   }
-  message += "<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>";
+  message += String(WiFi.RSSI()) + " (dBm) <a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>\r\n";
   server.sendContent(message) ;         
 }
 
 
 
 void SendHTTPPageFooter(){
-String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>") ;
-  message += F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>")  ;   
-  message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br>");
-  message += F("<a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br>");
-  message += F("<a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>") ;     
+String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>\r\n") ;
+  message += F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>\r\n")  ;   
+  message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br>\r\n");
+  message += F("<a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br>\r\n");
+  message += F("<a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
   server.sendContent(message) ;  
   message = "" ;       
 
-  message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>";
-//  message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>");
-  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>");
-  message += F("<a href='/rtceeprom'>RTC EEPROM Memory Contents (Valve Log Area)</a><br>");
-  message += F("<a href='/valvelog'>Valve Log</a><br>");
-  message += F("<a href='/setup'>Node Setup</a><br>");
-  message += F("<a href='/email'>Email Setup</a><br>");
-  message += F("<a href='/info'>Node Infomation</a><br>");
-  message += F("<a href='/btest'>Relay Board Test</a><br>");
-  message += F("<a href='/vsss'>view volatile memory structures</a><br>");
-  message += F("<a href='/fertque'>view fertigation data que</a><br>");
+  message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>\r\n";
+//  message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>\r\n");
+  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
+  message += F("<a href='/rtceeprom'>RTC EEPROM Memory Contents (Valve Log Area)</a><br>\r\n");
+  message += F("<a href='/valvelog'>Valve Log</a><br>\r\n");
+  message += F("<a href='/setup'>Node Setup</a><br>\r\n");
+  message += F("<a href='/email'>Email Setup</a><br>\r\n");
+  message += F("<a href='/info'>Node Infomation</a><br>\r\n");
+  message += F("<a href='/btest'>Relay Board Test</a><br>\r\n");
+  message += F("<a href='/vsss'>view volatile memory structures</a><br>\r\n");
+  message += F("<a href='/fertque'>view fertigation data que</a><br>\r\n");
   server.sendContent(message) ;  
   message = "" ;       
   
@@ -65,12 +65,12 @@ String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href=
   }else{
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
   }
-  message += "<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>";  
-  message += F("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
-  message += "<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br><br>";  
+  message += "<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>\r\n";  
+  message += F("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>\r\n");  
+  message += "<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br><br>\r\n";  
   snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
-  message += "Computer Uptime <b>"+String(buff)+"</b> (day:hr:min) <br>" ;
-  message += F("</body></html>\r\n");
+  message += "Computer Uptime <b>"+String(buff)+"</b> (day:hr:min) <br>\r\n" ;
+  message += F("</body></html>");
   server.sendContent(message) ;  
   message = "" ;       
 }
@@ -584,47 +584,51 @@ void handleRoot() {
   SendHTTPHeader();   //  ################### START OF THE RESPONSE  ######
 
   if ( bSaveReq != 0 ){
-    server.sendContent(F("<blink>"));      
+     message = F("<blink>");      
   }   
-  server.sendContent(F("<a href='/?command=2'>Save Parameters to EEPROM</a><br>")) ;     
+  message += F("<a href='/?command=2'>Save Parameters to EEPROM</a><br>\r\n") ;     
   if ( bSaveReq != 0 ){
-    server.sendContent(F("</blink><font color='red'><b>Changes Have been made to settings.<br>Make sure you save if you want to keep them</b><br></font><br>")) ;     
+    message += F("</blink><font color='red'><b>Changes Have been made to settings.<br>Make sure you save if you want to keep them</b><br></font><br>\r\n") ;     
   }
     
   if (ghks.lProgMethod == 0 ){    
-    server.sendContent(F("<a href='/prog'>Programs</a><br>")) ;         
+    message += ("<a href='/prog'>Programs</a><br>\r\n") ;         
   }else{
-    server.sendContent(F("<a href='/prognew'>Programs</a><br>")) ;             
+    message += F("<a href='/prognew'>Programs</a><br>\r\n") ;             
   }
 
   snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
   if (ghks.fTimeZone > 0 ) {
-    server.sendContent("<b>"+ String(buff) + " UTC +" + String(ghks.fTimeZone,1) ) ;   
+    message += "<b>"+ String(buff) + " UTC +" + String(ghks.fTimeZone,1) ;   
   }else{
-    server.sendContent("<b>"+ String(buff) + " UTC " + String(ghks.fTimeZone,1) ) ;       
+    message += "<b>"+ String(buff) + " UTC " + String(ghks.fTimeZone,1)  ;       
   }
   if ( year() < 2000 ) {
-    server.sendContent(F("  --- CLOCK NOT SET ---")) ;
+    message += F("  --- CLOCK NOT SET ---") ;
   }
-  server.sendContent(F("</b><br>")) ;  
+  message += F("</b><br>\r\n") ;  
   if ( ghks.AutoOff_t > now() )  {
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(ghks.AutoOff_t), month(ghks.AutoOff_t), day(ghks.AutoOff_t) , hour(ghks.AutoOff_t), minute(ghks.AutoOff_t), second(ghks.AutoOff_t));
-    server.sendContent(F("<b><font color=red>Automation OFFLINE Untill ")) ;  
-    server.sendContent(String(buff)) ; 
-    server.sendContent(F("</font></b><br>")) ; 
+    message += F("<b><font color=red>Automation OFFLINE Untill \r\n") ;  
+    message += String(buff) ; 
+    message += F("</font></b><br>\r\n") ; 
   }else{
     if ( year() > 2000 ) {
-      server.sendContent(F("<b><font color=green>Automation ONLINE</font></b><br>")) ;  
+      message += F("<b><font color=green>Automation ONLINE</font></b><br>\r\n") ;  
     }else{
-      server.sendContent(F("<b><font color=green>Automation OFFLINE Invalid time</font></b><br>")) ;        
+      message += F("<b><font color=green>Automation OFFLINE Invalid time</font></b><br>\r\n") ;        
     }
   }
-
+  server.sendContent(message);
+  message = "" ;
+    
   if (String(server.uri()).indexOf("stime")>0) {  // ################   SETUP TIME    #######################################
     bDefault = false ;
     snprintf(buff, BUFF_MAX, "%04d/%02d/%02d %02d:%02d", year(), month(), day() , hour(), minute());
-    server.sendContent("<br><br><form method=post action=" + server.uri() + "><br>Set Current Time: <input type='text' name='stime' value='"+ String(buff) + "' size=12>");
-    server.sendContent(F("<input type='submit' value='SET'><br><br></form>"));
+    message = "<br><br><form method=post action=" + server.uri() + "><br>Set Current Time: <input type='text' name='stime' value='"+ String(buff) + "' size=12>\r\n";
+    message += F("<input type='submit' value='SET'><br><br></form>\r\n");
+    server.sendContent(message);
+    message = "" ;
   }
 
   if (String(server.uri()).indexOf("btest")>0) {  // ################   TEST BOARD    #######################################
@@ -634,36 +638,38 @@ void handleRoot() {
     }else{
       MyColor = F("ABORT") ;
     }
-    server.sendContent(F("<br><br><b>Test Relay Board</b><br><table border=1 title='Test Coils and Relay Board'>"));
-    server.sendContent("<tr><th>Parameter</th><th>Value</th><th><form method=post action=" + server.uri() + "><input type='hidden' name='command' value='42'><input type='submit' value='"+MyColor+"'></form></th></tr>");
-    server.sendContent("<tr><td><form method=post action=" + server.uri() + ">Test Boad Number</td><td><input type='text' name='testb' value='"+ String(iTestBoard) + "' maxlength=2 size=4 align='center'>");
-    server.sendContent(F("</td><td><input type='submit' value='SET'></form></td></tr>"));
-    server.sendContent("<tr><td><form method=post action=" + server.uri() + ">Test Start/Coil Number</td><td><input type='text' name='testc' value='"+ String(iTestCoil) + "' maxlength=2 size=4 align='center'>");
-    server.sendContent(F("</td><td><input type='submit' value='SET'></form></td></tr>"));   
-    server.sendContent("<tr><td><form method=post action=" + server.uri() + ">Time between Coil Tests (s)</td><td><input type='text' name='testt' value='"+ String(iTestTime) + "' maxlength=2 size=4 align='center'>");
-    server.sendContent(F("</td><td><input type='submit' value='SET'></form></td></tr>"));
-    server.sendContent("</td><td><form method=post action=" + server.uri() + ">Test Mode</td><td><select name='tstinc'>") ;
+    message = F("<br><br><b>Test Relay Board</b><br><table border=1 title='Test Coils and Relay Board'>\r\n");
+    message += "<tr><th>Parameter</th><th>Value</th><th><form method=post action=" + server.uri() + "><input type='hidden' name='command' value='42'><input type='submit' value='"+MyColor+"'></form></th></tr>\r\n";
+    message += "<tr><td><form method=post action=" + server.uri() + ">Test Boad Number</td><td><input type='text' name='testb' value='"+ String(iTestBoard) + "' maxlength=2 size=4 align='center'>";
+    message += F("</td><td><input type='submit' value='SET'></form></td></tr>\r\n");
+    message += "<tr><td><form method=post action=" + server.uri() + ">Test Start/Coil Number</td><td><input type='text' name='testc' value='"+ String(iTestCoil) + "' maxlength=2 size=4 align='center'>";
+    message += F("</td><td><input type='submit' value='SET'></form></td></tr>\r\n");   
+    message += "<tr><td><form method=post action=" + server.uri() + ">Time between Coil Tests (s)</td><td><input type='text' name='testt' value='"+ String(iTestTime) + "' maxlength=2 size=4 align='center'>";
+    message += F("</td><td><input type='submit' value='SET'></form></td></tr>\r\n");
+    message += "</td><td><form method=post action=" + server.uri() + ">Test Mode</td><td><select name='tstinc'>" ;
     if (iTestInc == 1 ){
-      server.sendContent(F("<option value='0' SELECTED>0 - Increment After Coil Test")); 
-      server.sendContent(F("<option value='1'>1 - Test same coil")); 
+      message += F("<option value='0' SELECTED>0 - Increment After Coil Test"); 
+      message += F("<option value='1'>1 - Test same coil"); 
     }else{
-      server.sendContent(F("<option value='0'>0 - Increment After Coil Test")); 
-      server.sendContent(F("<option value='1' SELECTED>1 - Test same coil")); 
+      message += F("<option value='0'>0 - Increment After Coil Test"); 
+      message += F("<option value='1' SELECTED>1 - Test same coil"); 
     }
-    server.sendContent(F("</select></td><td><input type='submit' value='SET'></form></td></tr>"));
+    message += F("</select></td><td><input type='submit' value='SET'></form></td></tr>\r\n");
 
     if ( iTestMode == -1 ){
-      server.sendContent(F("</td><td colspan=3 align='center' bgcolor='ltgreen'><b>Normal Operation</b></td></tr>"));
+      message += F("</td><td colspan=3 align='center' bgcolor='ltgreen'><b>Normal Operation</b></td></tr>\r\n");
     }else{
-      server.sendContent("</td><td colspan=3 align='center' bgcolor='yellow'><b>Test In Progres - Coil "+String(iTestCoil)+"</b></td></tr>");  
+      message += "</td><td colspan=3 align='center' bgcolor='yellow'><b>Test In Progres - Coil "+String(iTestCoil)+"</b></td></tr>\r\n";  
     }
-    server.sendContent(F("</table>"));
+    message += F("</table>\r\n");
+    server.sendContent(message);
+    message = "" ;
   }
     
   
   if (String(server.uri()).indexOf("prog")>0) {  // #############################  program interface  #####################################
     bDefault = false ;
-    message = "<br><form method=post action=" + server.uri() + ">" ;
+    message = "<br><form method=post action=" + server.uri() + ">\r\n" ;
     message += "Program: <select name='prgm'>" ;
     for ( j = 0 ; j < MAX_PROGRAM ; j++ ){
       if ( j == iProgNum ){
@@ -673,8 +679,8 @@ void handleRoot() {
       }
       message += "<option value='"+String(j)+"' " + MyColor + " >" + String(j+1) ;
     }
-    message += F("</select><input type='submit' value='SET'></form><br>");
-    message += F("<b>Valve Programs</b><br><table border=1 title='Valve Program'>");
+    message += F("</select>\r\n<input type='submit' value='SET'></form><br>\r\n");
+    message += F("<b>Valve Programs</b><br><table border=1 title='Valve Program'>\r\n");
     message += F("<tr><th rowspan=2>Valve</th>");
     j = iProgNum ;
 //    for ( j = 0 ; j < MAX_PROGRAM ; j++ ){
@@ -687,7 +693,7 @@ void handleRoot() {
         message += "<th>" + String(dayarray[i]) + "</th>" ;
       }
 //    }
-    message +=F("</tr>");   
+    message +=F("</tr>\r\n");   
     server.sendContent(message) ; // End of Table Header
     
     for ( i = 0 ; i < ghks.lMaxDisplayValve ; i++ ){   // MAX_VALVE
@@ -736,18 +742,18 @@ void handleRoot() {
       for (j = 0 ; j < MAX_PROGRAM ; j++ ) {                   // lay down the run time
         message += "<td colspan=8><form method=post action=" + server.uri() + "><input type='text' name='v"+String(i)+"rt"+String(j)+"' value='" + String((vp[i].p[j].runtime)) + "' maxlength=5 size=2></td><td><input type='submit' value='SET'></td></form>";          
       }*/
-      message += F("<td><input type='submit' value='SET'></td></form></tr>"); 
+      message += F("<td><input type='submit' value='SET'></td></form></tr>\r\n"); 
       server.sendContent(message) ;
     }
-    server.sendContent(F("</table><br>"));    
+    server.sendContent(F("</table><br>\r\n"));    
   }
 
   if (String(server.uri()).indexOf("filt")>0) {  // ########################   filter interface   ##################################################
     bDefault = false ;
-    server.sendContent(F("<br><b>Filter Setup</b>"));
-    message = F("<table border=1 title='Filter Setup'>") ;
+    server.sendContent(F("<br><b>Filter Setup</b>\r\n"));
+    message = F("<table border=1 title='Filter Setup'>\r\n") ;
     message += F("<tr><th rowspan=2>Bank</th><th rowspan=2>Enable</th><th rowspan=2>Wash Delay</th><th rowspan=2>Wash Time</th><th rowspan=2>Canisters</th>") ; 
-    message += F("<th rowspan=2>Polarity</th><th colspan=17>Canister Control Relays</th></tr>") ;
+    message += F("<th rowspan=2>Polarity</th><th colspan=17>Canister Control Relays</th></tr>\r\n") ;
     message += F("<tr>");
     for ( j = 0 ; ( j < MAX_CANISTERS )  ; j++){
       message += F("<th>Board</th><th>Bit</th>");
@@ -776,35 +782,35 @@ void handleRoot() {
         message += "<td><input type='text' name='f" + String(i) + "a" + String(j) + "' value='" + String((efilter[i].BoardBit[j] & 0xf0)>>4) + "' maxlength=2 size=2></td>" ;
         message += "<td><input type='text' name='f" + String(i) + "b" + String(j) + "' value='" + String((efilter[i].BoardBit[j] & 0x0f)) + "' maxlength=2 size=2></td>";         
       }  
-      message += F("<td><input type='submit' value='SET'></td></form></tr>") ;
+      message += F("<td><input type='submit' value='SET'></td></form></tr>\r\n") ;
       server.sendContent(message) ;
       message = "" ;
     }
-    message = F("</table>") ;
+    message = F("</table>\r\n") ;
     server.sendContent(message) ;
   }
 
   if (String(server.uri()).indexOf("fert")>0) {  // ##############################   fertigation interface  ########################################
     bDefault = false ;
-    server.sendContent(F("<br><b>Fertigation Setup</b>"));
-    message = F("<table border=1 title='Fertigation Setup'>") ;
+    server.sendContent(F("<br><b>Fertigation Setup</b>\r\n"));
+    message = F("<table border=1 title='Fertigation Setup'>\r\n") ;
     message += F("<tr><th rowspan=2>Tank</th>") ;
     if (iPage==0) {
       message += F("<th colspan=8>Enable</th>");
-      message += F("<th>Current Qty</th><th>Max Qty</th><th rowspan=2>Description</th><th rowspan=2>Type</th><th rowspan=2>Master</th><th colspan=2 rowspan=2>.</th>");
+      message += F("<th>Current Qty</th><th>Max Qty</th><th rowspan=2>Description</th><th rowspan=2>Type</th><th rowspan=2>Master</th><th colspan=2 rowspan=2>.</th></tr>\r\n");
     }  
     if (iPage==2) {
-      message += F("<th>On Time</th><th>Off time</th><th>Base Flow</th><th>Pump Rate</th><th colspan=2>Connection</th><th rowspan=2>.</th></tr>") ; 
+      message += F("<th>On Time</th><th>Off time</th><th>Base Flow</th><th>Pump Rate</th><th colspan=2>Connection</th><th rowspan=2>.</th></tr>\r\n") ; 
     }
     message += F("<tr>") ;                   // second header row 
     if (iPage==0) {
       for ( j = 0 ; j < 8 ; j++ ){
         message += "<th>" + String(dayarray[j]) + "</th>" ;
       }
-      message += F("<th>(l)</th><th>(l)</th>");
+      message += F("<th>(l)</th><th>(l)</th></tr>\r\n");
     }
     if (iPage==2) {
-      message += F("<th>(s)</th><th>(s)</th><th>(l/s)</th><th>(l/s)</th><th>Board</th><th>Bit</th></tr>") ; 
+      message += F("<th>(s)</th><th>(s)</th><th>(l/s)</th><th>(l/s)</th><th>Board</th><th>Bit</th></tr>\r\n") ; 
     }
     server.sendContent(message) ;
     message = "" ;
@@ -886,19 +892,19 @@ void handleRoot() {
       if (iPage==0) {
         message += "<td><form method=post action=" + server.uri() + "><input type='hidden' name='xcqt"+String(i)+"' value='" + String(efert[i].MaxQty) + "'><input type='submit' value='REFILL'></form></td>" ;
       }
-      message += F("</tr>") ;
+      message += F("</tr>\r\n") ;
       server.sendContent(message) ;
       message = "" ;
     }
-    message = F("</table>") ;
+    message = F("</table>\r\n") ;
     server.sendContent(message) ;
   }
 
   if (String(server.uri()).indexOf("vsss")>0) {  // volitile status - all structures status
     bDefault = false ;
-    server.sendContent(F("<br><b>Fertigation Status</b>"));
-    message = F("<table border=1 title='Fertigation Status'>") ;
-    message += F("<tr><th>Tank</th><th>Run</th><th>Enable</th><th>On/Off</th><th>lTTG</th><th>Flowrate</th></tr>") ; 
+    server.sendContent(F("<br><b>Fertigation Status</b>\r\n"));
+    message = F("<table border=1 title='Fertigation Status'>\r\n") ;
+    message += F("<tr><th>Tank</th><th>Run</th><th>Enable</th><th>On/Off</th><th>lTTG</th><th>Flowrate</th></tr>\r\n") ; 
     server.sendContent(message) ;
     message = "" ;
     
@@ -913,15 +919,15 @@ void handleRoot() {
       message += "<td>" + String(vfert[i].bEnable) + "</td>";
       message += "<td>" + String(vfert[i].bOnOff) + "</td>";
       message += "<td>" + String(vfert[i].lTTG) + "</td>";
-      message += "<td>" + String(vfert[i].Flowrate) + "</td><tr>";
+      message += "<td>" + String(vfert[i].Flowrate) + "</td></tr>\r\n";
       server.sendContent(message) ;
       message = "" ;
     }
-    message = F("</table>") ;
+    message = F("</table>\r\n") ;
     server.sendContent(message) ;
 
-    message = F("<br><b>Filter Status</b><br><table border=1 title='Filter Status'>") ;
-    message += F("<tr><th>Filter</th><th>Next Can</th><th>bOnOff</th><th>bFlush</th><th>lTTG</th></tr>") ; 
+    message = F("<br><b>Filter Status</b><br><table border=1 title='Filter Status'>\r\n") ;
+    message += F("<tr><th>Filter</th><th>Next Can</th><th>bOnOff</th><th>bFlush</th><th>lTTG</th></tr>\r\n") ; 
     server.sendContent(message) ;
     message = "" ;
     for ( i = 0 ; i < MAX_FILTER ; i++){
@@ -934,15 +940,15 @@ void handleRoot() {
       message += "<td>" + String(vfilter[i].NextCan) + "</td>";
       message += "<td>" + String(vfilter[i].bOnOff) + "</td>";
       message += "<td>" + String(vfilter[i].bFlush) + "</td>";
-      message += "<td>" + String(vfilter[i].lTTG) + "</td><tr>";
+      message += "<td>" + String(vfilter[i].lTTG) + "</td></tr>\r\n";
       server.sendContent(message) ;
       message = "" ;
     }
-    message = F("</table>") ;
+    message = F("</table>\r\n") ;
     server.sendContent(message) ;
 
-    message = F("<br><b>Valve Status</b><br><table border=1 title='Valve Status'>") ;
-    message += F("<tr><th>Valve</th><th>bOnOff</th><th>lATTG</th><th>lTTG</th><th>iFB</th></tr>") ; 
+    message = F("<br><b>Valve Status</b><br><table border=1 title='Valve Status'>\r\n") ;
+    message += F("<tr><th>Valve</th><th>bOnOff</th><th>lATTG</th><th>lTTG</th><th>iFB</th></tr>\r\n") ; 
     server.sendContent(message) ;
     message = "" ;
     for ( i = 0 ; i < MAX_VALVE ; i++){
@@ -955,33 +961,32 @@ void handleRoot() {
       message += "<td>" + String(vvalve[i].bOnOff,BIN) + "</td>";
       message += "<td>" + String(vvalve[i].lATTG) + "</td>";
       message += "<td>" + String(vvalve[i].lTTG) + "</td>";
-      message += "<td>" + String(vvalve[i].iFB,HEX) + "</td><tr>";
+      message += "<td>" + String(vvalve[i].iFB,HEX) + "</td></tr>\r\n";
       server.sendContent(message) ;
       message = "" ;
     }
-    message = F("</table>") ;
+    message = F("</table>\r\n") ;
     server.sendContent(message) ;
-    message = F("<br><b>ADC Input Status</b><br><table border=1 title='ADC Status'>") ;
-    message += "<tr><td>Raw </td><td>" + String(ADC_Raw) + "</td><td>(Counts)</td></tr>"  ;
-    message += "<tr><td>Cooked </td><td>" + String(ADC_Value) + "</td><td>("+ String(ghks.ADC_Unit) + ")</td></tr>"  ;
-    message += F("</table>") ;
+    message = F("<br><b>ADC Input Status</b><br><table border=1 title='ADC Status'>\r\n") ;
+    message += "<tr><td>Raw </td><td>" + String(ADC_Raw) + "</td><td>(Counts)</td></tr>\r\n"  ;
+    message += "<tr><td>Cooked </td><td>" + String(ADC_Value) + "</td><td>("+ String(ghks.ADC_Unit) + ")</td></tr>\r\n"  ;
+    message += F("</table>\r\n") ;
     server.sendContent(message) ;
-    
-    server.sendContent(message) ;
+    message = "" ;    
   }
   
   if (bDefault) {     // #####################################   default valve control and setup  ##############################################
-    server.sendContent(F("<br><b>Logical Valve Control</b>"));
-    message = F("<table border=1 title='Logical Valve Control'>") ;
+    server.sendContent(F("<br><b>Logical Valve Control</b>\r\n"));
+    message = F("<table border=1 title='Logical Valve Control'>\r\n") ;
     message += F("<tr><th rowspan=2>Valve</th>") ;               // first heading row of table ( there are 2 )
     if (bExtraValve) {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
-        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=4>On</th><th colspan=4>Off</th></tr>");      
-        message += F("<tr><th title='Cascade to Master Valve Number'>Cascade</th><th title='Always On - ignore global off until dates'>AO</th><th title='Domestic Water - Only activate if clear of fertiliser'>DW</th><th title='This is a master valve'>MV</th><th title='Feeback Circuit Present'>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th></tr>") ; 
+        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=4>On</th><th colspan=4>Off</th></tr>\r\n");      
+        message += F("<tr><th title='Cascade to Master Valve Number'>Cascade</th><th title='Always On - ignore global off until dates'>AO</th><th title='Domestic Water - Only activate if clear of fertiliser'>DW</th><th title='This is a master valve'>MV</th><th title='Feeback Circuit Present'>FB</th><th>Valve</th><th>RX</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th><th>Rly</th><th>Brd</th><th title='Active Polarity'>Pol</th><th title='Pulse Length'>Pulse</th>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
-        message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;
+        message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>\r\n" ;
         message += F("<tr><th>Rly</th><th>Brd</th>") ;
         for ( i = 0 ; ( i < 8 ) && ( i < MAX_FERT ) ; i++ ){
           message += "<th>" + String(i+1) + "</th>" ;
@@ -990,9 +995,9 @@ void handleRoot() {
           message += "<th>" + String(i+1) + "</th>" ;
         }
       }
-      message += F("</tr>") ;
+      message += F("</tr>\r\n") ;
     }else{                           // second heading row
-      message += F("<th rowspan=2 colspan=2>State</th><th rowspan=2>Enable</th><th rowspan=2>ATTG</th><th rowspan=2>MTTG</th><th rowspan=2>DTTG</th></tr><tr></tr>") ;
+      message += F("<th rowspan=2 colspan=2>State</th><th rowspan=2>Enable</th><th rowspan=2>ATTG</th><th rowspan=2>MTTG</th><th rowspan=2>DTTG</th></tr><tr></tr>\r\n") ;
     }
     for ( i = 0 ; i < ghks.lMaxDisplayValve ; i++){       // MAX_VALVE
       MyNum = String(i) ;
@@ -1113,19 +1118,18 @@ void handleRoot() {
           }          
         }
       }
-      message += F("<td><input type='submit' value='SET'></td></form></tr>") ;
+      message += F("<td><input type='submit' value='SET'></td></form></tr>\r\n") ;
       server.sendContent(message) ;
       message = "" ;
     }
     if ( !bExtraValve ){
-      message += "<tr><form method=post action=" + server.uri() + "><td colspan=8 align=center><input type='hidden' name='command' value='0'><input type='submit' value='### MANUAL ALL OFF ###'></td></form></tr>" ;
+      message += "<tr><form method=post action=" + server.uri() + "><td colspan=8 align=center><input type='hidden' name='command' value='0'><input type='submit' value='### MANUAL ALL OFF ###'></td></form></tr>\r\n" ;
     }
-    message += F("</table>");
+    message += F("</table>\r\n");
     server.sendContent(message) ;
+    message = "" ;
   }
-
   SendHTTPPageFooter();
-
 }
 
 

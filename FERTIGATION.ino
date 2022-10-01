@@ -338,9 +338,9 @@ void DisplayShowFertQue(){
   
   SendHTTPHeader();
 
-  message = F("<br><center><b>Fertigation Data Que</b><br><a href='/?command=333'>Zero/Reset Fertigation Data Que</a><br>");
-  message += F("<table border=1 title='Fertigation Data Que'>");
-  message += F("<tr><th>Log</th><th>Date</th><th>Tank</th><th>Valves</th><th>Amount</th></tr>");
+  message = F("<br><center><b>Fertigation Data Que</b><br><a href='/?command=333'>Zero/Reset Fertigation Data Que</a><br>\r\n");
+  message += F("<table border=1 title='Fertigation Data Que'>\r\n");
+  message += F("<tr><th>Log</th><th>Date</th><th>Tank</th><th>Valves</th><th>Amount</th></tr>\r\n");
   server.sendContent(message);
   message = "" ;
   for (int i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
@@ -351,9 +351,9 @@ void DisplayShowFertQue(){
     }
     snprintf(buff, BUFF_MAX, "%02d/%02d/%04d %02d:%02d:%02d", day(flq[i].RecDate), month(flq[i].RecDate), year(flq[i].RecDate), hour(flq[i].RecDate), minute(flq[i].RecDate), second(flq[i].RecDate) );     
     MyValves = String(flq[i].Valves,BIN) + " - " + String(flq[i].Valves) ;
-    server.sendContent( "<tr><td "+MyColor+">"+String(i)+"</td><td>"+String(buff)+"</th><th>"+flq[i].FertMixID+"</th><th>"+MyValves+"</th><th>"+flq[i].Amount+"</th></tr>");
+    server.sendContent( "<tr><td "+MyColor+">"+String(i)+"</td><td>"+String(buff)+"</th><th>"+flq[i].FertMixID+"</th><th>"+MyValves+"</th><th>"+flq[i].Amount+"</th></tr>\r\n");
   }
-  server.sendContent(F("</table>"));    
+  server.sendContent(F("</table>\r\n"));    
   SendHTTPPageFooter();
 
 }
