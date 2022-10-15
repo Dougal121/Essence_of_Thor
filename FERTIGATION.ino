@@ -17,7 +17,7 @@ uint8_t fbit , board ;
        if (( evalve[i].Fertigate != 0 ) && (( evalve[i].TypeMaster & 0x80 ) == 0 ))  {                   // check if switched on first and check its not a master valve
           for ( j = 0 ; j < MAX_FERT ; j++){
             if (((evalve[i].Fertigate & ( 0x01 << j )) != 0 ) && ( efert[j].CurrentQty > 0 )) {          // check which fertigation channels are active
-              if ((( efert[j].DaysEnable & ( 0x01 << (k-1) )) != 0  ) && (( efert[j].DaysEnable & ( 0x80 )) != 0  )) {   // check if enabled for these days
+              if ((( efert[j].DaysEnable & ( 0x01 << (k-1) )) != 0  ) && (( efert[j].DaysEnable & ( 0x80 )) != 0  ) && !bFertDisable ) {   // check if enabled for these days
                 vfert[j].Flowrate += evalve[i].Flowrate ;                                                // work out the total flow rate 
                 vfert[j].bRun = true ;    
                 if ((efert[j].AType & 0xC0 ) != 0 ) {                                                    // if a chemical valve see what channel has the pump and keep it enabled
@@ -42,7 +42,7 @@ uint8_t fbit , board ;
       board = ( efert[j].BoardBit & 0xf0 ) >> 4 ;
       fbit = ( efert[j].BoardBit & 0x0f ) ;
       if ( vfert[j].bRun ) {
-        if (( efert[j].DaysEnable & 0x80 ) != 0 ){             // if it is enabled then start output
+        if ((( efert[j].DaysEnable & 0x80 ) != 0 )&&(!bFertDisable)){             // if it is enabled then start output
           if ( vfert[j].lTTG == 0 ) {                          // ie not in cycle
             if ( efert[j].BaseFlow > 0 ){
               vfert[j].lTTG = ( efert[j].OnTime * vfert[j].Flowrate / efert[j].BaseFlow ) + 1 ;

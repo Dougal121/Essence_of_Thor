@@ -112,6 +112,10 @@ bool bRoach = false ;
                 snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 2 when Main Valve off\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
+            case 666:
+                snprintf(csTemp,MESSAGE_MAX,"I2C Bus device(s) have changed state\r\n\0"  )  ;  
+                i = MAX_FERT ;
+            break;
             
             default: snprintf(csTemp,MESSAGE_MAX,"%s \0",SMTP.subject ) ; 
                 i = MAX_FERT ;
@@ -133,7 +137,11 @@ bool bRoach = false ;
       if ( String(SMTP.BCC).length() > 5 ){
         WDmail.addBCC(SMTP.BCC );
       }
-      
+
+      if (iMessageID == 666 ){
+        strcat(csTemp,strBusResults.c_str() ) ;  // if a buss alarm add this in
+        strBusResults = "" ; // clear after sending
+      }
       if (ghks.lProgMethod == 0 ){
         snprintf(buff,BUFF_MAX,"\r\nMode By Valve \r\n\r\n\0" ) ;
       }else{
@@ -267,7 +275,14 @@ void DisplayEmailSetup() {
     i = String(server.argName(j)).indexOf("smpo");
     if (i != -1){ 
       SMTP.port = String(server.arg(j)).toInt() ;
-    }       
+    }
+    i = String(server.argName(j)).indexOf("bsci");
+    if (i != -1){ 
+      SMTP.iBusScanInterval = String(server.arg(j)).toInt() ;
+      if (( SMTP.iBusScanInterval < MINBUSSCANINTERVAL ) && ( SMTP.iBusScanInterval > 0 )){
+        SMTP.iBusScanInterval = MINBUSSCANINTERVAL ;
+      }
+    }
     i = String(server.argName(j)).indexOf("lotk");
     if (i != -1){ 
       SMTP.LowTankQty= String(server.arg(j)).toFloat() ;
@@ -279,7 +294,7 @@ void DisplayEmailSetup() {
     }
     i = String(server.argName(j)).indexOf("smuy");
     if (i != -1){  //  
-        SMTP.bSPARE = false ;
+        SMTP.bSpare = false ;
     }
     i = String(server.argName(j)).indexOf("smue");
     if (i != -1){  //  
@@ -290,7 +305,7 @@ void DisplayEmailSetup() {
     i = String(server.argName(j)).indexOf("smup");
     if (i != -1){  //  
       if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
-        SMTP.bSPARE = true ;        
+        SMTP.bSpare = true ;        
       }
     }     
 
@@ -384,8 +399,10 @@ void DisplayEmailSetup() {
         ghks.ADC_Alarm_Mode |=  0x01 ;              
       }
     }  
-        
-    
+    i = String(server.argName(j)).indexOf("frtadc");
+    if (i != -1){ 
+      ghks.lFertActiveOptions = constrain( String(server.arg(j)).toInt(),0,3) ;                      
+    }    
   }
 
   SendHTTPHeader();   //  ################### START OF THE RESPONSE  ######
@@ -434,7 +451,9 @@ void DisplayEmailSetup() {
     break;
   }
   message += "</td><td></td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
-    
+  server.sendContent(message) ;
+
+  message = "" ;    
   message += "<tr><form method=post action=" + server.uri() + "><td colspan=3>Alarm 1 <select name='alme1'>" ;
   for ( j = 0 ; j < 4 ; j++ ){ 
     if ((( ghks.ADC_Alarm_Mode & 0x06 )>>1 ) == j ){
@@ -494,17 +513,34 @@ void DisplayEmailSetup() {
   message += "</select> <input type='text' name='all2' value='"+String(ghks.ADC_Alarm2)+"' size=6> ("+String(ghks.ADC_Unit)+")</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   
   message += "<tr><form method=post action=" + server.uri() + "><td>Alarm Delay</td><td align=center><input type='text' name='aldl' value='"+String(ghks.ADC_Alarm_Delay)+"' size=30></td><td>(s)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
-  message += "<tr><form method=post action=" + server.uri() + "><td title='-1 to disable alarm emails'>Tank Low Alarm Volume</td><td align=center><input type='text' name='lotk' value='"+String(SMTP.LowTankQty)+"' size=30></td><td>(L)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
-  if ( ( SMTP.bSPARE ) != 0 ){
-    MyCheck = F("CHECKED")  ;    
-  }else{
-    MyCheck = F("")  ;    
+
+  message += "<tr><form method=post action=" + server.uri() + "><td>ADC Alarms to disable fert</td>" ;
+  message += "<td><select name='frtadc'>" ;
+  for ( j = 0 ; j < 4 ; j++ ){ 
+    if (( ghks.lFertActiveOptions & 0x03 ) == j ){
+      MyCheck = "SELECTED" ;
+    }else{
+      MyCheck = "" ;
+    }
+    message += "<option value='"+String(j)+"' " + MyCheck +">" ;
+    switch ( j ){
+      case 0: message += F("None") ;  break ;
+      case 1: message += F("Greater Than Only") ; break ;
+      case 2: message += F("Less Than Only") ; break ;
+      case 3: message += F("Any ADC Alarm") ; break ;
+    }
   }
-  message += "<tr><form method=post action=" + server.uri() + "><td title='SPAREemails'><input type='hidden' name='smuy' value='0'>SPARE Emails</td><td align=center><input type='checkbox' name='smup' " + String(MyCheck)+ "></td><td>.</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+  message += "</select></td><td>.</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+  server.sendContent(message) ;
+  message = "" ;    
+
+  message += "<tr><form method=post action=" + server.uri() + "><td title='-1 to disable alarm emails'>Tank Low Alarm Volume</td><td align=center><input type='text' name='lotk' value='"+String(SMTP.LowTankQty)+"' size=30></td><td>(L)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+
+  message += "<tr><form method=post action=" + server.uri() + "><td title='Bus Monitor -1 disables'>Bus Monitor Emails</td><td align=center><input type='text' name='bsci' value='"+String(SMTP.iBusScanInterval)+"' size=30></td></td><td>(min)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   if ( ( SMTP.bUseEmail ) != 0 ){
     MyCheck = F("CHECKED")  ;    
   }else{
-    MyCheck = F("")  ;    
+    MyCheck = ""  ;    
   }
   message += "<tr><form method=post action=" + server.uri() + "><td><input type='hidden' name='smuz' value='0'>Use Email Alarm Messaging</td><td align=center><input type='checkbox' name='smue' " + String(MyCheck)+ "></td><td>.</td><td><input type='submit' value='SET'></td></form></tr>" ;
   message += "<tr><form method=post action=" + server.uri() + "><td colspan=4 align='center'><input type='hidden' name='command' value='11'><input type='submit' value='### SEND TEST EMAIL ###'></td></form></tr>\r\n" ;

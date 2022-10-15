@@ -242,7 +242,8 @@ void ioScan() {
   uint8_t j , k , kk ;
   uint8_t BoardBit ;
   String message ;  
-  String bgcolor ;  
+  String bgcolor ;
+  uint8_t  error ;    
 /*
   message = "Web Request URI: ";
   message += server.uri();
@@ -259,7 +260,7 @@ void ioScan() {
   Serial.println(message);
   */
   for (uint8_t j=0; j<server.args(); j++){
-    for ( ii = 0 ; ii < MAX_BOARDS ; ii++){                              // handle all the filter control arguments
+    for ( ii = 0 ; ii < MAX_BOARDS ; ii++){                              // handle all the io control arguments
       i = String(server.argName(j)).indexOf("a" + String(ii));
       if (i != -1){                                     
         k = String(server.arg(j)).toInt() ;  // board address
@@ -290,7 +291,17 @@ void ioScan() {
   
   for (i = 0; i < MAX_BOARDS ; i++) {                             // for each board
     server.sendContent(F("<tr>"));
-    server.sendContent("<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='a"+String(i)+"'>");
+    bgcolor = "title='Device not found'" ;
+    Wire.beginTransmission(eboard[i].Address);
+    error = Wire.endTransmission();
+    if ( error == 0 ){
+      bgcolor = F("bgcolor = 'Lime' title='Device On Line'") ;
+    }else{
+      if (error == 4){
+        bgcolor = F("bgcolor = 'Red' title='Device Faulted'") ;      
+      }
+    }
+    server.sendContent("<tr><form method=get action=" + server.uri() + "><td "+bgcolor+">"+String(i)+"</td><td><select name='a"+String(i)+"'>");
     message = "" ;
     switch (eboard[i].Type){
       case 0:

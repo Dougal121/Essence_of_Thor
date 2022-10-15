@@ -47,6 +47,8 @@ ESPMail WDmail;
 #define LineText     0
 #define Line        12
 
+#define MINBUSSCANINTERVAL 5  // minimum bus scan time in minutes
+
 //                 0x11223344
 #define MYVER 0x12345679     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 #define MYVER_NEW 0x12345680     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
@@ -247,7 +249,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   uint8_t lDisplayOptions  ;              // 83 
   uint8_t lNetworkOptions  ;              // 84 
   uint8_t ValveLogOptions  ;              // 85 
-  uint8_t lSpare2  ;                      // 86 
+  uint8_t lFertActiveOptions  ;           // 86   was lSpare2
   char timeServer[24] ;                   // 110   = {"au.pool.ntp.org\0"}
   char cpassword[16] ;                    // 126
   long lVersion  ;                        // 130
@@ -300,7 +302,9 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char subject[64] ;
   bool bUseEmail ;
   float LowTankQty ;
-  bool bSPARE ; 
+  bool bSpare ;
+  int  iBusScanInterval ;
+  int  iBusState[8] ; // 16 x 8 bits of bus state
 } Email_App_stuff_t ;          
 
 Email_App_stuff_t SMTP;
@@ -356,12 +360,16 @@ long  MyTestSum ;
 long lTimePrev ;
 long lTimePrev2 ;
 long lMinUpTime = 0 ;
+long lMinBusScan = 30 ;
 long lRet_Email = 0 ;
 float ADC_Value = 0 ;
 int   ADC_Raw = 0 ; 
 bool  bSentADCAlarmEmail = false ;
 long ADC_Trigger = 0 ;
 int   iAutoResetStatus = 0 ; 
+bool bBusGood = true ;
+bool bFertDisable = false ;
+
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
 
@@ -369,7 +377,7 @@ ESP8266WebServer server(80);
 ESP8266WebServer OTAWebServer(81);
 ESP8266HTTPUpdateServer OTAWebUpdater;
 //DNSServer dnsServer;
-
+String strBusResults = "" ;
 //void BackInTheBoxMemory(void);
 
 
@@ -524,7 +532,8 @@ int i , k , j = 0;
     Serial.println("Loading memory defaults...");
     delay(2000);
   }
-
+  
+  WiFi.setOutputPower(20.5);      // SHOUT LOUDER !!!
   WiFi.disconnect();
   Serial.println("Configuring soft access point...");
   WiFi.mode(WIFI_AP_STA);  // we are having our cake and eating it eee har
@@ -705,11 +714,14 @@ bool bDirty = false ;
 bool bDirty2 = false ;
 long lTD ;
 bool bTrigger = false ;
+bool bTriggerLess = false ;
+bool bTriggerMore = false ;
 int iMailMsg = 0 ;
 int iHM = 0 ; 
 int iDOW = 0 ;
 int iRebootTime = 0 ;
 time_t NowTime ;
+int iBusReturn = 0 ;
   
   server.handleClient();
   OTAWebServer.handleClient();
@@ -965,10 +977,13 @@ time_t NowTime ;
     ADC_Value = ((ghks.ADC_Cal_Mul * (( 1.0 * ADC_Raw ) + ghks.ADC_Cal_Ofs ) / 1023 ) )  ;
     if (( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ) {
       bTrigger = false ;
+      bTriggerLess = false ;
+      bTriggerMore = false ;
       if ((( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ) || ( (( ghks.ADC_Alarm_Mode & 0x02 ) == 0x02 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x04 ) == 0x04 ) && !bValveActive ))  {    // alarm 1 on 
         if (( ghks.ADC_Alarm_Mode & 0x01 ) != 0 ){ // looking for a high alarm else jump down for a low on
           if ( ADC_Value > ghks.ADC_Alarm1 ) {     // high alarm test 
             bTrigger = true ;  
+            bTriggerMore = true ;
             if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){  // this is the always case
                 iMailMsg = 5 ;              
             }else{
@@ -982,6 +997,7 @@ time_t NowTime ;
         }else{
           if ( ADC_Value < ghks.ADC_Alarm1 ) { // low alarm test
             bTrigger = true ;
+            bTriggerLess = true ;
             if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){   // this is the always case
                 iMailMsg = 7 ;                                
             }else{
@@ -998,6 +1014,7 @@ time_t NowTime ;
         if (( ghks.ADC_Alarm_Mode & 0x08 ) != 0 ){   // looking for a high alarm on number 2 else jump down for the low one
           if ( ADC_Value > ghks.ADC_Alarm2 ) {       //  check the level
             bTrigger = true ;      
+            bTriggerMore = true ;
             if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){  // this is the always active
                 iMailMsg = 6 ;                                
             }else{
@@ -1011,6 +1028,7 @@ time_t NowTime ;
         }else{
           if ( ADC_Value < ghks.ADC_Alarm2 ) {        // check the low alarm 
             bTrigger = true ;
+            bTriggerLess = true ;
             if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){   // this is the always active
                 iMailMsg = 8 ;     // alarm 2 always                           
             }else{
@@ -1025,12 +1043,19 @@ time_t NowTime ;
       }
       
       if ( bTrigger ) {
+        switch ( ghks.lFertActiveOptions ){           
+          case 1: if ( bTriggerMore ) bFertDisable = true ;  break ;      // greater than
+          case 2: if ( bTriggerLess ) bFertDisable = true ;  break ;      // less than
+          case 3: bFertDisable = true ;  break ;                          // Any  
+          default: bFertDisable = false ;  break ;                        // none  ie zero 0  
+        }
         if (!bSentADCAlarmEmail) {
           ADC_Trigger++ ;           
         }               
       }else{
         ADC_Trigger = 0 ;      
         iMailMsg = 0 ;
+        bFertDisable = false ;
       }
       if (ADC_Trigger > ghks.ADC_Alarm_Delay) {
         if ( !bSentADCAlarmEmail ){
@@ -1045,8 +1070,6 @@ time_t NowTime ;
       iMailMsg = 0 ;
       bSentADCAlarmEmail = false ;
     }
-
-    
   } else{                        // end of the once per second stuff
     if ( bSendTestEmail ){
       SendEmailToClient(-1) ;
@@ -1065,6 +1088,9 @@ time_t NowTime ;
         DS3231_get(&tc);
         setTime((int)tc.hour,(int)tc.min,(int)tc.sec,(int)tc.mday,(int)tc.mon,(int)tc.year ) ; // set the internal RTC
       }
+    }
+    if(hour() == 7){
+      bBusGood = true ;  // retrigger this once a day to remind usesrs
     }
     rtc_hour = hour();
   }
@@ -1126,6 +1152,26 @@ time_t NowTime ;
     if (iValveLogTTG>0){
       iValveLogTTG -- ;
     }
+    if ( lMinBusScan > 0 ) {
+      lMinBusScan -- ;
+    }
+    if (lMinBusScan == 0 ) {
+      if (SMTP.iBusScanInterval>0) {
+        iBusReturn = i2cBusCheck();
+        if (( iBusReturn != 0 ) && bBusGood ){
+          if ( SMTP.bUseEmail ) {
+            SendEmailToClient(666); 
+          }
+          bBusGood = false ;
+        }
+        if ( SMTP.iBusScanInterval < MINBUSSCANINTERVAL ){
+          lMinBusScan = MINBUSSCANINTERVAL ;          
+        }else{
+          lMinBusScan = SMTP.iBusScanInterval ;          
+        }
+      }
+    }
+    
     if ((ghks.ValveLogOptions & 0x80 )!=0 ){
       UpDateValveLogs();
     }

@@ -60,10 +60,10 @@ String message =  F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href=
   server.sendContent(message) ;  
   message = "" ;       
   
-  if (!WiFi.isConnected()) {
-    snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
-  }else{
+  if (bPrevConnectionStatus) {
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
+  }else{
+    snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
   }
   message += "<a href='http://" + String(buff) + ":81/update'>OTA Firmware Update</a><br>\r\n";  
   message += F("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>\r\n");  
