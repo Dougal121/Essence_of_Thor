@@ -24,3 +24,4 @@ LocalCPU I/O<br>
 07/06/2022 Testing and debugging with actual pressure transducer, added new valve type that always runs it's program(no tempary offline)<br>
 27/06/2022 All of the above running in the feild. Endurance testing in progress....<br>
 02/10/2022 Field testing going well minor updates to pages to trak a maybe problem with WiFi.
+16/10/2022 Added a automated bus scan and alarm due to interboard cable issues, emails when it looses com with an i/o device also added the ability to shut of fertigation if in ADC alarm (ie low or high pressures)
