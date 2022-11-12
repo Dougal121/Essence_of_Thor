@@ -536,7 +536,7 @@ void DisplayEmailSetup() {
 
   message += "<tr><form method=post action=" + server.uri() + "><td title='-1 to disable alarm emails'>Tank Low Alarm Volume</td><td align=center><input type='text' name='lotk' value='"+String(SMTP.LowTankQty)+"' size=30></td><td>(L)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
 
-  message += "<tr><form method=post action=" + server.uri() + "><td title='Bus Monitor -1 disables'>Bus Monitor Emails</td><td align=center><input type='text' name='bsci' value='"+String(SMTP.iBusScanInterval)+"' size=30></td></td><td>(min)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td title='Bus Monitor -1 disables'>Bus Monitor Interval</td><td align=center><input type='text' name='bsci' value='"+String(SMTP.iBusScanInterval)+"' size=30></td></td><td>(min)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   if ( ( SMTP.bUseEmail ) != 0 ){
     MyCheck = F("CHECKED")  ;    
   }else{

@@ -124,7 +124,7 @@ void i2cScan() {
   i = i2cBusCheck();
   if (i != 0 ){
     server.sendContent(strBusResults);
-    
+    bBusGood = false ;
   }
   SendHTTPPageFooter();  
   server.sendContent(F("</body></html>\r\n"));

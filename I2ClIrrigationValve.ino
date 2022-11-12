@@ -130,6 +130,7 @@ typedef struct __attribute__((__packed__)) {            // volitile stuff
   int16_t lTTG   ;          // minutes  
   int16_t lTTC ;            // time to clear the line after pump has last activated (seconds -- counts down)    
   bool    bNetOnOff ;       // network on off status
+  double  dblMoisture ;     // current moisture level
 } valve__t ;                // 8 bytes   
 
 typedef struct __attribute__((__packed__)) {            // permanent record
@@ -767,8 +768,16 @@ int iBusReturn = 0 ;
     display.drawString(0 , LineText, String(buff) );
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
+    if ( bBusGood ){
+    }else{
+      display.drawString(127 , 42, String("-BUS-"));    
+      if (( rtc_sec % 2 ) == 0 ){
+        display.setColor(INVERSE);
+        display.fillRect(95, 42, 32, 12);
+      }
+    }
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    i = ( rtc_sec >> 1 ) % 6 ;
+    i = ( rtc_sec >> 1 ) % 7 ;
     switch (i){
       case 1:
         MyIP =  WiFi.localIP() ;  // update to see if has connection                  
@@ -792,6 +801,13 @@ int iBusReturn = 0 ;
           case 2: snprintf(buff, BUFF_MAX, "Auto Reboot in %d min", (ghks.SelfReBoot - lMinUpTime )); break ;
           case 3: snprintf(buff, BUFF_MAX, "REBOOT IN ONE MINUTE"); break ;
           default: snprintf(buff, BUFF_MAX, "Auto Reboot OFF") ; break;
+        }
+      break;
+      case 6:
+        if ( strBusResults.length() == 0 ){
+          snprintf(buff, BUFF_MAX, "--- I2C BUS NORMAL ---" );
+        }else{
+          snprintf(buff, BUFF_MAX, "%s", strBusResults.c_str() );
         }
       break;
       default:

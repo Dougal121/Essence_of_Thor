@@ -8,11 +8,12 @@ unsigned long processNTPpacket(void){
     const unsigned long seventyYears = 2208988800UL;                                    // now convert NTP time into everyday time:     Unix time starts on Jan 1 1970. In seconds, that's 2208988800:   
     unsigned long epoch = secsSince1900 - seventyYears + long(SECS_PER_HOUR * ghks.fTimeZone );   // subtract seventy years:
     unsigned long timediff = epoch - now();
-    timediff = abs(timediff) ;  // dont use to set RTC if more than 30 min out
+    timediff = abs(timediff) ;                                                          // dont use to set RTC if more than 30 min out
 
-    setTime((time_t)epoch);                                                             // update the clock
 
-    if (((year(epoch) > 2019 ) && ( timediff < 1800 )) || bManSet ){
+    if (((year(epoch) > 2019 ) && (( timediff < 1800 ) || ( year() == 1970 )))   || bManSet ){
+        setTime((time_t)epoch);                                                             // update the clock
+        snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());    
         tc.sec = second();     
         tc.min = minute();     
         tc.hour = hour();   
@@ -20,11 +21,14 @@ unsigned long processNTPpacket(void){
         tc.mday = day();  
         tc.mon = month();   
         tc.year = year();       
+//        snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", tc.year, tc.mon, tc.mday , tc.hour, tc.min, tc.sec);
         DS3231_set(tc);                       // set the RTC as well
         bManSet = false ;
     }else{
       Serial.println(F("*** Time NOT set to RTC year out of range ***"));  
+      snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(epoch), month(epoch), day(epoch) , hour(epoch), minute(epoch), second(epoch));    
     }
+    Serial.println( String(buff)) ;       
     
     Serial.print(F("Unix time = "));
     Serial.println(epoch);                                                              // print Unix time:
