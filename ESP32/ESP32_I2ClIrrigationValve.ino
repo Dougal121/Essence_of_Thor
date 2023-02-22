@@ -8,28 +8,57 @@
     Newer copies can be found at https://github.com/Dougal121/Essence_of_Thor
 
     The idea is to provide low cost high tech fertigation/irrigation control for real world farming which is scalable from small to medium size farms (0.1 to 100 Ha)
-    
+
+    Yo Dude this is in need of ping and email to get it going again
+
+    Compile for TTGO LaRA board Version 1.0 
 */
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <WebServer.h>
+#include <WiFi.h>              // All creature great and small as long as they are WiFi based 
+#include <WiFiClient.h>        //
+#include <WebServer.h>         // what it says on the box
 //#include <ESPmDNS.h>
-#include <WiFiUDP.h> 
+#include <WiFiUDP.h>           // UDP protocal driver
 #include <Update.h>
-#include <TimeLib.h>
-#include <Wire.h>
-#include <EEPROM.h>
-#include <stdio.h>
-#include "PCF8574DJP.h"
-#include "Adafruit_MCP23017.h"
-#include "SSD1306.h"
-//#include "SH1106.h"
-#include "SH1106Wire.h"
-#include "ds3231.h"
+#include <TimeLib.h>           //
+#include <Wire.h>              // I2C bus driver
+#include <EEPROM.h>            // Internal chip eeprom
+#include <stdio.h>             // The odd angree shot in pure C
+#include "PCF8574DJP.h"        // 
+#include "Adafruit_MCP23017.h" // Port expansion driver 
+#include "SSD1306.h"           // OLED Display
+//#include "SH1106.h"          // OLED Display
+#include "SH1106Wire.h"        // Another breed of OLED
+#include "ds3231.h"            // RTC
+#include <ESP_Mail_Client.h>   // Include ESP Mail Client library (this library)
+#include <LoRa.h>
+
+//define the pins used by the LoRa transceiver module
+#define SCK 5
+#define MISO 19
+#define MOSI 27
+#define SS 18
+#define RST 14
+#define DIO0 26
+
+#define OLED_SDA 4
+#define OLED_SCL 15 
+#define OLED_RST 16
+
+//433E6 for Asia
+//866E6 for Europe
+//915E6 for North America
+#define BAND 915E6
+
+#include "uEEPROMLib.h"    //   SD card lib for the RTC memory logging
+//#include <ESP8266Ping.h>
+uEEPROMLib rtceeprom(0x57);
 
 #define ESP32_BUILTIN_LED 2
 #define BUFF_MAX 32
 /* Display settings */
+
+#define MIN_REBOOT  720             //   720   12 hours normally      10 min for testing
+
 #define minRow       0              /* default =   0 */
 #define maxRow     127              /* default = 127 */
 #define minLine      0              /* default =   0 */
@@ -38,18 +67,38 @@
 #define LineText     0
 #define Line        12
 
+#define MAX_LOCAL_IO 39
+
+#if defined(ESP32)
+#define MaxPinPort  40
+#define MinPinPort   0
+#define ADC_MAX_CHAN  6 
+#elif defined(ESP8266)
+#define MaxPinPort  18
+#define MinPinPort   0
+#define ADC_MAX_CHAN  1 
+#endif      
+
+#define ADC_MAX_ALARM ADC_MAX_CHAN * 4
+
+#define MINBUSSCANINTERVAL 5  // minimum bus scan time in minutes
+
 #include "StaticPages.h"
 
 //                 0x11223344
 #define MYVER 0x12435678     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+#define MYVER_NEW 0x12345680     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+const int button = 0;    //Push Button address / used to wake up wifi on remote nodes
 
-const int MAX_EEPROM = 2000 ;
+const int MAX_EEPROM = 4000 ;
 //const byte SETPMODE_PIN = D8 ; 
 //const byte FLASH_BTN = D3 ;    // GPIO 0 = FLASH BUTTON 
 //const byte SCOPE_PIN = D7 ;
 const byte MAX_WIFI_TRIES = 45 ;
-const byte PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE_NEW = 320 ;   // where the irrigation valve setup and program information starts in eeprom
 const byte MAX_VALVE =  16 ;   // these two easily changed just watch the memory 
+const byte MAX_REM_LIST = 16 ; // number of remote nodes to monitor
 const byte MAX_PROGRAM = 4 ;   // valves * program is the biggest memory number ... can do 32 x 4 OK but need to allocate more EEPROM
 const byte MAX_FERT = 6 ;      // fertigation units MAXIUM of 8 <- DEAL & CODE BREAKER
 const byte MAX_FILTER = 1 ;    // can have more but whats the point ? again max of 8
@@ -60,10 +109,15 @@ const byte MAX_SHIFTS = 64 ;
 const byte MAX_STARTS = 4 ;
 const int  MAX_MINUTES = 10080 ; // maximum minutes in a 7 day cycle
 const byte MAX_BOARDS = 16 ;
+const byte MAX_DAYS = 7 ;
+const byte MAX_MONTHS = 12 ;
+const byte MAX_WEEKS = 53 ;
+const byte MAX_FERT_LOGS = 24 ;
 const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a system
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
+SSD1306 display(0x3c, 4 ,15 );   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
 //SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
+//SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
 
 
 /*
@@ -79,7 +133,7 @@ SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  --
 Adafruit_MCP23017 mcp[MAX_MCP23017] ;
 
 typedef struct __attribute__((__packed__)) {             // permanent record
-  int16_t TypeMaster;        // NoFert 0-1 normal-nofert Type 0-1 normal=master 0-1 nofeedbak-feedback 0-1 and Master valve ID 0-63   2 bits + 6 bits
+  int16_t TypeMaster;        // Always_On 0-1 normal-never_offline Domesitic_Water 0-1 normal-nofert Valve_Type 0-1 normal=master FeedBack 0-1 nofeedbak-feedback  and Master valve ID 0-63   3 bits + 6 bits
   uint8_t OnCoilBoardBit;    // 16 boards + 16 Outputs   4 + 4 bits
   uint8_t OffCoilBoardBit;   // 16 boards + 16 Outputs  4 + 4 bits
   uint8_t OnOffPolPulse ;    // 4 bits on 4 bits off pulse and polarity ie 1 + 3 x 50 ms + 50ms base 
@@ -95,6 +149,19 @@ typedef struct __attribute__((__packed__)) {             // permanent record
   char    description[MAX_DESCRIPTION] ;   //
 } valve_t ;                  // 27 bytes    (16x = 432 )
 
+typedef struct __attribute__((__packed__)) {             // permanent record
+  uint16_t Weekly[MAX_WEEKS];
+  uint16_t Monthly[MAX_MONTHS]; 
+  uint16_t Daily[MAX_DAYS];        // Daily Totals
+} valve_totals_t ;                 // 64 bytes ( 16x = 1024 )        144 bytes ( 16x = 2304 )
+
+typedef struct __attribute__((__packed__)) {             // permanent record
+  time_t Weekly[MAX_WEEKS];      // have a date for the start of each period so ca tell if its been rolled over for reset purposes
+  time_t Monthly[MAX_MONTHS]; 
+  time_t Daily[MAX_DAYS];       
+} valve_totals_dates_t ;         // 7 + 12 + 53 = 72    x 4 for long =>  288 byes  ie two of the ones above     
+
+
 typedef struct __attribute__((__packed__)) {            // volitile stuff
   bool    bOnOff ;          // on off status
   uint8_t iFB    ;          // feedback status 
@@ -102,6 +169,7 @@ typedef struct __attribute__((__packed__)) {            // volitile stuff
   int16_t lTTG   ;          // minutes  
   int16_t lTTC ;            // time to clear the line after pump has last activated (seconds -- counts down)    
   bool    bNetOnOff ;       // network on off status
+  double  dblMoisture ;     // current moisture level  
 } valve__t ;                // 8 bytes   
 
 typedef struct __attribute__((__packed__)) {            // permanent record
@@ -116,6 +184,13 @@ typedef struct __attribute__((__packed__)) {            // permanent record
   uint8_t BoardBit ;        // 16 boards + 16 Bits  --- what outpuut this is attached to.
   char    description[MAX_DESCRIPTION] ;  //
 } fertigation_t ;           // 31 bytes   (8x = 248)
+
+typedef struct __attribute__((__packed__)) {            // permanent record
+  time_t  RecDate;      // have a date for the start of each period so ca tell if its been rolled over for reset purposes
+  int32_t FertMixID ;   // mix or tank id 
+  int32_t Valves ; 
+  float   Amount ;
+} fertigation_log_que_item_t ;                              // maybe need 50 of these ? x 16 bytes
 
 typedef struct __attribute__((__packed__)) {            // volitile component 
   bool    bRun ;            // pump in run mode 
@@ -189,7 +264,10 @@ valve__t          vvalve[MAX_VALVE] ;    // volitile valve stuff
 fertigation__t    vfert[MAX_FERT] ;      // volitile fertigation stuff
 filter__t         vfilter[MAX_FILTER] ;  // volitile valve stuff
 local_t           elocal ;
-
+valve_totals_t    rtcVT[MAX_VALVE];      // to be read / stored in RTC board eeprom
+valve_totals_t    rtcTest;               // compare so we dont write the whole thing...  
+valve_totals_dates_t  rtcVTDates ;       // 
+fertigation_log_que_item_t  flq[MAX_FERT_LOGS] ; // memory only structure
 
 typedef struct __attribute__((__packed__)) {     // eeprom stuff
   unsigned int localPort = 2390;          // 2 local port to listen for NTP UDP packets
@@ -207,8 +285,8 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   time_t AutoOff_t ;                      // 82     auto off until time > this date   
   long lDisplayOptions  ;                 // 86 
   uint8_t lNetworkOptions  ;              // 84 
-  uint8_t lSpare1  ;                      // 85 
-  uint8_t lSpare2  ;                      // 86 
+  uint8_t ValveLogOptions  ;              // 85 
+  uint8_t lFertActiveOptions  ;           // 86   was lSpare2
   char timeServer[24] ;                   // 110   = {"au.pool.ntp.org\0"}
   char cpassword[16] ;                    // 126
   long lVersion  ;                        // 130
@@ -216,9 +294,112 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   IPAddress IPGateway ;                   // (192,168,0,1)    
   IPAddress IPMask ;                      // (255,255,255,0)   
   IPAddress IPDNS ;                       // (192,168,0,15)     
+  char servername[32] ;
+  long SelfReBoot ;
+  long lRebootTimeDay ;
+  float ADC_Cal_Mul ;
+  float ADC_Cal_Ofs ;
+  char  ADC_Unit[5] ;                     // units for display
+  uint8_t  ADC_Alarm_Mode ;               // high low etc   0x80 Contious enable 0x40 Master Valve Only Enable  0x20  Alram 2 master  0x10 Alarm 1 master     0x02 Alarm 1 high   0x01 Alarm 2 high
+  float ADC_Alarm1 ;
+  float ADC_Alarm2 ;                      // 
+  uint16_t  ADC_Alarm_Delay ;             // trigger to alarm in seconds
+  uint8_t ADC_Input_PIN1 ;
+  uint8_t ADC_Input_PIN2 ;
 } general_housekeeping_stuff_t ;          // computer says it's 136 not 130 ??? is my maths crap ????
 
 general_housekeeping_stuff_t ghks ;
+
+typedef struct __attribute__((__packed__)) {     // eeprom stuff
+  float ADC_Cal_Mul ;                            // 
+  float ADC_Cal_Ofs ;                            //
+  char  ADC_Unit[6] ;                            // units for display
+  uint8_t ADC_Input_PIN ;
+  int ADC_RAW ;
+  float ADC_Value ;
+} adc_chan_t ;                                   // 
+
+typedef struct __attribute__((__packed__)) {     // eeprom stuff
+  uint8_t  ADC_Channel ;
+  uint8_t  ADC_Mode ;      // high low etc  
+  float    ADC_Value ;     //
+  uint16_t ADC_Delay ;     // trigger to alarm in seconds
+  uint8_t  ADC_Action ;    // high low etc  
+} adc_alarm_t ;                                   // 
+
+typedef struct __attribute__((__packed__)) {     // eeprom stuff
+  adc_chan_t chan[ADC_MAX_CHAN];
+  adc_alarm_t alarm[ADC_MAX_ALARM] ;
+} adc_stuff_t ;          // 
+
+adc_stuff_t adcs ;
+
+typedef struct __attribute__((__packed__)) {
+  int16_t lATTG  ;            // programed (automatic) minutes
+  int16_t lTTG   ;            // minutes  
+  int16_t lTTC ;              // time to clear the line after pump has last activated (seconds -- counts down)    
+  uint8_t Fertigate ;         // 8 bits for tanks 0 -> 7
+  uint8_t ValveNo ;
+  int16_t Node ;
+  float   Flowrate ;          // L/s  flow ??
+} cnc_v_t ;                   // 14 bytes
+
+typedef struct __attribute__((__packed__)) {
+  uint8_t      cmd ;
+  uint8_t      spare ;
+  time_t       mc ;              // master clock
+  uint8_t      snode ;           // source node
+  uint8_t      valves ;          // number to follow
+  cnc_v_t      cv[16] ;          // the most that we can have   16 x 14 = 224
+  int16_t      crc ;
+} cnc_t ;                        // 234 bytes
+
+typedef struct __attribute__((__packed__)) {
+  uint8_t      cmd ;
+  uint8_t      total ;        // 
+  time_t       mc ;              // master clock
+  uint8_t      snode ;           // source node
+  uint8_t      uplinked ;        // number acted on
+  int          Rssi ;
+  long         FE ;
+  float        Snr ;
+  long         spare1 ;
+  long         spare2 ; 
+  int16_t      crc ;
+} cnc_ack_t ;                        // 28 bytes
+
+typedef struct __attribute__((__packed__)) {
+  int          node ;
+  int          Rssi ;
+  float        Snr ;
+  time_t       txt ;
+  time_t       rxt ;
+  uint8_t      total ;        // 
+  uint8_t      uplinked ;        // number acted on
+} cnc_nodes_t ;                  // 12 bytes
+
+cnc_nodes_t   remlist[MAX_REM_LIST] ;
+
+typedef struct __attribute__((__packed__)) {     // eeprom stuff 
+  int  port;
+  char server[48] ;
+  char user[48] ;
+  char password[48] ;
+  char FROM[48] ;
+  char TO[48] ;
+  char CC[48] ;
+  char BCC[48] ;
+  bool bSecure ;
+  char message[64] ;
+  char subject[64] ;
+  bool bUseEmail ;
+  float LowTankQty ;
+  bool bSpare ;
+  int  iBusScanInterval ;
+  int  iBusState[8] ; // 16 x 8 bits of bus state
+} Email_App_stuff_t ;          
+
+Email_App_stuff_t SMTP;
 
 char cssid[32] = {"Configure_XXXXXXXX\0"} ;
 char *host = "Control_00000000\0";                // overwrite these later with correct chip ID
@@ -247,6 +428,8 @@ int  efertAddress ;
 long lRebootCode = 0 ;
 uint8_t rtc_status ;
 struct ts tc;  
+bool bPrevConnectionStatus = false;
+unsigned long lTimeNext = 580000 ;           // next network retry 9 ish minutes from the start
 
 int iTestBoard = 0 ;
 int iTestMode = -1 ; 
@@ -257,20 +440,47 @@ int iTestCoil = 0 ;
 int bSaveReq = 0 ;
 uint64_t chipid = 0 ;
 int iUploadPos = 0 ;
+int iValveLogTTG = 60 ;
 long  MyCheckSum ;
 long  MyTestSum ;
+int LoRaLastRssi = 0 ;
+float LoRaLastSnr = 0 ;
+long LoRaLastFrequencyError = 0 ; 
+long LoRaTxPCnt = 0 ;
+long LoRaRxPCnt = 0 ;
 bool bDoTimeUpdate = false ;
-unsigned long lTimeNext = 0 ;     // next network retry
-bool bPrevConnectionStatus = false;
+bool bSendTestEmail = false ;
+bool bSendSaveConfirm = false ;
+bool bValveLogDirty = false ; 
+bool bDoFertUpload = false ;
+bool bValveActive = false ; 
+bool bManSet = false ;
+bool bBusy = false ;
 
 long lTimePrev ;
 long lTimePrev2 ;
 long lMinUpTime = 0 ;
+long lMinBusScan = 30 ;
+long lRet_Email = 0 ;
+float ADC_Value = 0 ;
+int   ADC_Raw1 = 0 ; 
+int   ADC_Raw2 = 0 ; 
+bool  bSentADCAlarmEmail = false ;
+long ADC_Trigger = 0 ;
+int   iAutoResetStatus = 0 ; 
+bool bBusGood = true ;
+bool bFertDisable = false ;
+bool bLoRa = false ; 
+bool bButton = false ;
+int  iDisplayCountDown = 0 ;
+String strBusResults ;
 
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
 WebServer server(80);
 
+SMTPSession smtp;          // Declare the global used SMTPSession object for SMTP transport
+ESP_Mail_Session session;  // Declare the global used ESP_Mail_Session for user defined session credentials
 
 
 /*
@@ -319,19 +529,27 @@ int i , k , j = 0;
   pinMode(ESP32_BUILTIN_LED,OUTPUT);  //  D4 builtin LED
 //  pinMode(SETPMODE_PIN,INPUT_PULLUP);
   
-  pinMode(12,OUTPUT);  // D6      ok setup 4 the outputs bar the i2c to be outputs
+/*  pinMode(12,OUTPUT);  // D6      ok setup 4 the outputs bar the i2c to be outputs
   pinMode(13,OUTPUT);  // D7 
   pinMode(14,OUTPUT);  // D5
-  pinMode(15,OUTPUT);  // D8
+  pinMode(15,OUTPUT);  // D8*/
 
   EEPROM.begin(MAX_EEPROM);
   LoadParamsFromEEPROM(true);
+
+   //reset OLED display via software
+  pinMode(OLED_RST, OUTPUT);
+  digitalWrite(OLED_RST, LOW);
+  delay(20);
+  digitalWrite(OLED_RST, HIGH);
 
   display.init();
   if (( ghks.lDisplayOptions & 0x01 ) != 0 ) {  // if bit one on then flip the display
     display.flipScreenVertically();
   }
-
+  
+  pinMode(button, INPUT_PULLUP);  // set up the button
+  
   /* show start screen */
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_CENTER);  
@@ -345,7 +563,9 @@ int i , k , j = 0;
   display.setTextAlignment(TEXT_ALIGN_RIGHT);  
   display.drawString(127, 50, String(Toleo));
   display.display();
-    
+
+  ClearRemoteNodeList();
+  
   for (i = 0 ; i < MAX_VALVE ; i++ ) {   // setup the defaults in the 3 volitile structs that support data comin back from eeprom
     vvalve[i].lATTG = 0 ;
     vvalve[i].lTTG = 0 ;
@@ -412,17 +632,18 @@ int i , k , j = 0;
     }
   }
   j = 0 ;
+  ZeroFertQue();  
   delay(1000);
-//  Serial.println("Chip ID " + String(ESP.getChipId(), HEX));
+//  Serial.println("Chip ID " + String(chipid, HEX));
 //  Serial.println("Configuring WiFi...");
 
   display.setFont(ArialMT_Plain_10);
 
-  if ( MYVER != ghks.lVersion ) {
+  if ( MYVER_NEW != ghks.lVersion ) {
 //  if ( false ) {
     BackInTheBoxMemory();         // load defaults if blank memory detected but dont save user can still restore from eeprom
     Serial.println("Loading memory defaults...");
-    delay(2000);
+    delay(200);
   }
 
   WiFi.disconnect();
@@ -433,6 +654,9 @@ int i , k , j = 0;
     sprintf(ghks.cpassword,"\0");
   }
   MyIPC = IPAddress (192, 168, 5 +(chipid & 0x7f ) , 1);
+  Serial.print("Asking for Soft AP on address: ");
+  snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
+  Serial.println(buff);
   WiFi.softAPConfig(MyIPC,MyIPC,IPAddress (255, 255, 255 , 0));  
   Serial.println("Starting access point...");
   Serial.print("SSID: ");
@@ -446,7 +670,7 @@ int i , k , j = 0;
     WiFi.softAP((char*)cssid,(char*) ghks.cpassword);
   }
   MyIPC = WiFi.softAPIP();  // get back the address to verify what happened
-  Serial.print("Soft AP IP address: ");
+  Serial.print("Soft AP IP Started on address: ");
   snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
   Serial.println(buff);
   
@@ -456,9 +680,9 @@ int i , k , j = 0;
     WiFi.config(ghks.IPStatic,ghks.IPGateway,ghks.IPMask,ghks.IPDNS ); 
   }  
   if ( ghks.npassword[0] == 0 ){
-    WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point      
+    WiFi.begin((char*)ghks.nssid);                            // connect to unencrypted access point      
   }else{
-    WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
+    WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);     // connect to access point with encryption
   }
   while (( WiFi.status() != WL_CONNECTED ) && ( j < MAX_WIFI_TRIES )) {
     j = j + 1 ;
@@ -542,8 +766,13 @@ int i , k , j = 0;
   server.on("/stime", handleSTime);
   server.on("/btest", handleBTest);
   server.on("/info", handleInfo);
+  server.on("/email", DisplayEmailSetup);
+  server.on("/fertque", DisplayShowFertQue);  
   server.on("/iolocal", ioLocalMap);
+  server.on("/adc", adcLocalMap);
   server.on("/eeprom", DisplayEEPROM);
+  server.on("/valvelog",DisplayValveLog);
+  server.on("/valvelog.csv", HTTP_GET , DisplayValveLog);  
   server.on("/backup", HTTP_GET , handleBackup);
   server.on("/backup.txt", HTTP_GET , handleBackup);
   server.on("/backup.txt", HTTP_POST,  handleRoot, handleFileUpload); 
@@ -606,6 +835,23 @@ int i , k , j = 0;
 
   randomSeed(now());                       // now we prolly have a good time setting use this to roll the dice for reboot code
   lRebootCode = random(1,+2147483640) ;
+
+  LoRa.setPins(SS, RST, DIO0); 
+  while (!LoRa.begin(BAND) && (j < 10)) 
+  {
+    Serial.print(".");
+    j++;
+    delay(500);
+  }
+  
+  if (j == 10) {
+    Serial.println("Starting LoRa failed");    
+    bLoRa = false ;
+  }else{
+    Serial.println("LoRa Initialization OK");  
+    bLoRa = true ;
+  }
+  
 }
 
 //  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
@@ -623,9 +869,21 @@ bool bSendCtrlPacket = false ;
 bool bDirty = false ;
 bool bDirty2 = false ;
 long lTD ;
+bool bTrigger = false ;
+bool bTriggerLess = false ;
+bool bTriggerMore = false ;
+int iMailMsg = 0 ;
+int iHM = 0 ; 
+int iDOW = 0 ;
+int iRebootTime = 0 ;
+time_t NowTime ;
+
+int iBusReturn = 0 ;
+
 
   server.handleClient();
-
+  DoLaRaStuff();
+  
   lTime = millis() ;
   iTestTime = constrain(iTestTime,2,50);
   iTestMode = constrain(iTestMode,-1,16);
@@ -667,19 +925,95 @@ long lTD ;
     display.drawString(0 , LineText, String(buff) );
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127 , LineText, String(WiFi.RSSI()));
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    if (( rtc_sec & 0x02 ) == 0  ){  // altinate the ip addresses ( setup AP and client to AP )
-      snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
+
+    if ( bBusGood ){
     }else{
-      snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
-    }    
+      display.drawString(127 , 42, String("-BUS-"));    
+      if (( rtc_sec % 2 ) == 0 ){
+        display.setColor(INVERSE);
+        display.fillRect(95, 42, 32, 12);
+      }
+    }
+    
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    i = ( rtc_sec >> 1 ) % 8 ;
+    switch (i){
+      case 1:
+        MyIP =  WiFi.localIP() ;  // update to see if has connection                  
+        snprintf(buff, BUFF_MAX, "IP %03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);      
+      break;
+      case 2:
+        snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
+      break;
+      case 3:
+       snprintf(buff, BUFF_MAX, "%s - %d", ghks.NodeName,ghks.lNodeAddress );   
+      break;
+      case 4:
+       snprintf(buff, BUFF_MAX, "Up Time %d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
+      break;
+      case 5:
+        switch (iAutoResetStatus){
+          case -1: snprintf(buff, BUFF_MAX, "Auto Reboot %d",( ghks.lRebootTimeDay & 0xfff )); break ;
+          case -2: snprintf(buff, BUFF_MAX, "Auto Reboot Today %d",( ghks.lRebootTimeDay & 0xfff )); break ;
+          case -3: snprintf(buff, BUFF_MAX, "REBOOT IN ONE MINUTE"); break ;
+          case 1: snprintf(buff, BUFF_MAX, "Reboot interval %d min", ghks.SelfReBoot ); break ;
+          case 2: snprintf(buff, BUFF_MAX, "Auto Reboot in %d min", (ghks.SelfReBoot - lMinUpTime )); break ;
+          case 3: snprintf(buff, BUFF_MAX, "REBOOT IN ONE MINUTE"); break ;
+          default: snprintf(buff, BUFF_MAX, "Auto Reboot OFF") ; break;
+        }
+      break;
+      case 6:
+        if ( strBusResults.length() == 0 ){
+          snprintf(buff, BUFF_MAX, "--- I2C BUS NORMAL ---" );
+        }else{
+          snprintf(buff, BUFF_MAX, "%s", strBusResults.c_str() );
+        }
+      break;  
+      case 7:
+        if ( bLoRa ){
+          snprintf(buff, BUFF_MAX, "LaPa RSSI %d SNR %.1f FE %d",LoRaLastRssi,LoRaLastSnr , LoRaLastFrequencyError );          
+        }else{
+          snprintf(buff, BUFF_MAX, "### LoRa Offline ###" );          
+        }
+      break;    
+      default:
+        snprintf(buff, BUFF_MAX, "%s", cssid );            
+      break;
+    }
     display.drawString(64 , 53 ,  String(buff) );
-      
+    if (( abs(iAutoResetStatus) == 3 ) && (i == 5)) {
+       display.setColor(INVERSE);
+       display.fillRect(0, 53, 128, 11);            
+    }
+    if ( iTestMode == -1 ){   // test mode uses this area as well so dont display in test mode
+      display.setTextAlignment(TEXT_ALIGN_RIGHT);
+      display.drawString(128 , 33 ,  String(ADC_Value,1)+ String(" (") +String(ghks.ADC_Unit)+ String(" )") );
+      if ( bSentADCAlarmEmail ){
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(128 , 43 ,  String("*") );      
+      }
+      if ( ADC_Trigger > 0 ) {
+         display.drawString(128 , 43 , String(iMailMsg) + "-" + String(ADC_Trigger) + " / " + String(ghks.ADC_Alarm_Delay) );
+         display.setColor(INVERSE);
+         display.fillRect(64, 33, 64, 21);
+      }
+    }
+    if (ghks.lProgMethod == 0 ){
+      UpdateATTG() ;                                          // update the program switching Time To Go timers
+    }else{
+      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
+    }   
+    bValveActive = false ;
+  
     for (i = 0 ; i < MAX_VALVE ; i++ ) {              // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
-      if (( evalve[i].TypeMaster & 0x80 ) != 0 ){      // This is the master valve check
+      if (( evalve[i].TypeMaster & 0x80 ) != 0 ){             // This is the master valve check
         vvalve[i].lTTG = 0 ;
-        for (k = 0 ; k < MAX_VALVE ; k++ ) {          // scan the list again  
-          j = ( evalve[k].TypeMaster & 0x3f ) - 1 ;        // look for a subordinate valve
+        if ( evalve[i].Node != 0 ){
+           evalve[i].Fertigate = 0 ;
+           evalve[i].Flowrate = 0 ;
+        }
+        for (k = 0 ; k < MAX_VALVE ; k++ ) {                  // scan the list again  
+          j = ( evalve[k].TypeMaster & 0x3f ) - 1 ;           // look for a subordinate valve
           if (j == i){
             if ( evalve[i].bEnable ){
               if ( vvalve[i].lATTG < vvalve[k].lATTG ){
@@ -689,9 +1023,13 @@ long lTD ;
             if ( vvalve[i].lTTG < vvalve[k].lTTG ){
               vvalve[i].lTTG = vvalve[k].lTTG ;
             }
+            if (((vvalve[k].lTTG > 0 )||(vvalve[k].lATTG)) && ( evalve[i].Node != 0 )){  // if subordinate going then add the other stuff
+              evalve[i].Fertigate |= evalve[k].Fertigate ;
+              evalve[i].Flowrate += evalve[k].Flowrate ;
+            }
           }    
         }
-      }
+      }      
       if ( i < 16 ) {
         x = i * 8 ;
         y = 15 ;       
@@ -700,6 +1038,9 @@ long lTD ;
         y = 23 ;       
       }  
       if ( vvalve[i].bOnOff ){   // valve on
+        if (( evalve[i].TypeMaster & 0x80 ) != 0x00  ){
+          bValveActive = true ;
+        }          
         if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){  // look if it has feedback
           display.drawCircle(x+3, y, 3);
           display.drawLine(x+1, y - 2, x+5, y + 2);
@@ -738,6 +1079,8 @@ long lTD ;
         display.drawCircle(i*8+3, 41, 1);
       }       
     }
+    if ( iDisplayCountDown == 0 )
+      display.clear();  // turn off all the pixels
     display.display();
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( bDirty ) {
@@ -754,24 +1097,27 @@ long lTD ;
         vvalve[i].iFB  = 0x01 & GetIntput(((evalve[i].FeedbackBoardBit & 0xf0 ) >> 4 ) , (evalve[i].FeedbackBoardBit & 0x0f ));
       }
       OnPol = ((evalve[i].OnOffPolPulse & 0x80  ) >> 7  ) ;
-      OffPol = ((evalve[i].OnOffPolPulse & 0x40  ) >> 3  ) ;
+      OffPol = ((evalve[i].OnOffPolPulse & 0x08  ) >> 3  ) ;
       OnPulse = ((evalve[i].OnOffPolPulse & 0x70  ) >> 4  ) ;
       OffPulse = ((evalve[i].OnOffPolPulse & 0x07  )  ) ;
-      OnPol = LOW ;
-      OffPol = LOW ;
+//      OnPol = LOW ;
+//      OffPol = LOW ;
       OnPulse =  ghks.lPulseTime % 128 ;
       OffPulse =  ghks.lPulseTime % 128 ;
       if (((vvalve[i].lTTG > 0 )|| (vvalve[i].lATTG > 0))&&(!vvalve[i].bOnOff)){
         vvalve[i].bOnOff = true ;
         board = ( evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ; 
-        board = 0 ; // hard code for the moment
-        if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {    // 16 x  8 bit expanders
-//          IOEXP[board].write( evalve[i].OnCoilBoardBit , OnPol );                    // hold on 
+        board = 0 ;                                                                        // hard code for the moment
+        if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {                     // 16 x  8 bit expanders
+//          IOEXP[board].write( evalve[i].OnCoilBoardBit , OnPol );                        // hold on 
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , 0 ) ;
         }else{
-//          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );       // Pulse On          
+//          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );           // Pulse On          
+//          Serial.println("On Pulse " + String(OnPulse));
+          OnPol = LOW ;
+          OffPol = HIGH ;
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
-          delay(OnPulse);
+          delay(ghks.lPulseTime % 128 ); 
         }        
       }
       if ((vvalve[i].lTTG <= 0 )&&(vvalve[i].lATTG <= 0 )&&(vvalve[i].bOnOff)){
@@ -782,9 +1128,11 @@ long lTD ;
 //          IOEXP[board].write( evalve[i].OffCoilBoardBit , !OnPol );   // hold off
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , 0 ) ;
         }else{
+          OnPol = LOW ;
+          OffPol = HIGH ;          
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );   // Pulse Off 
           ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , OffPulse ) ;
-          delay(OffPulse);
+          delay(ghks.lPulseTime % 128 ); 
         }
       }
       if ( vvalve[i].bNetOnOff != vvalve[i].bOnOff ){
@@ -794,15 +1142,21 @@ long lTD ;
 //        }
       }
     }
-    digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
+    if (WiFi.isConnected())  {
+      digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
+    }else{
+      if (( rtc_sec % 2 ) == 0 )    {
+        digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));        
+      }
+    }
     rtc_sec = second() ;
     lScanLast = lScanCtr ;
     lScanCtr = 0 ;
-    if (ghks.lProgMethod == 0 ){
-      UpdateATTG() ;                                          // update the program switching Time To Go timers
-    }else{
-      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
-    }
+//    if (ghks.lProgMethod == 0 ){
+//      UpdateATTG() ;                                          // update the program switching Time To Go timers
+//    }else{
+//      UpdateATTGNew() ;                                       // update the program switching Time To Go timers      
+//    }
     if (( evalve[i].TypeMaster & 0x100 ) != 0 ){            // wee patch if this is a fert bar valve on then the line is clear of fertiliser
       if ( evalve[i].bEnable && !bDirty2 && ( vvalve[i].lATTG == 0 )){   // this is active
         vvalve[i].lATTG = 2 ;
@@ -810,9 +1164,140 @@ long lTD ;
     }     
     fertigation_min();
     fertigation_sec();
+
+    for ( i = 0 ; i < ADC_MAX_CHAN ; i++ ) {
+      if (( adcs.chan[i].ADC_Input_PIN > 0 ) && (adcs.chan[i].ADC_Input_PIN<40)) {
+        adcs.chan[i].ADC_RAW = analogRead(adcs.chan[i].ADC_Input_PIN) ;
+        adcs.chan[i].ADC_Value = ((adcs.chan[i].ADC_Cal_Mul * (( 1.0 * adcs.chan[i].ADC_RAW ) + adcs.chan[i].ADC_Cal_Ofs ) / 1023 ) )  ;
+      }else{
+        adcs.chan[i].ADC_RAW = 0 ;
+        adcs.chan[i].ADC_Value = 0 ; 
+      }
+    }
+
+    if (ghks.ADC_Input_PIN1 > 0 ){
+      ADC_Raw1 = analogRead(ghks.ADC_Input_PIN1) ;
+    }
+    if (ghks.ADC_Input_PIN2 > 0 ){
+      ADC_Raw2 = analogRead(ghks.ADC_Input_PIN2) ;
+    }
+    ADC_Value = ((ghks.ADC_Cal_Mul * (( 1.0 * ADC_Raw1 ) + ghks.ADC_Cal_Ofs ) / 1023 ) )  ;
+    if (( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ) {
+      bTrigger = false ;
+      bTriggerLess = false ;
+      bTriggerMore = false ;
+      if ((( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ) || ( (( ghks.ADC_Alarm_Mode & 0x02 ) == 0x02 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x04 ) == 0x04 ) && !bValveActive ))  {    // alarm 1 on 
+        if (( ghks.ADC_Alarm_Mode & 0x01 ) != 0 ){ // looking for a high alarm else jump down for a low on
+          if ( ADC_Value > ghks.ADC_Alarm1 ) {     // high alarm test 
+            bTrigger = true ;  
+            bTriggerMore = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){  // this is the always case
+                iMailMsg = 5 ;              
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 9 ;                 
+              }else{
+                iMailMsg = 13 ;
+              }
+            }
+          }          
+        }else{
+          if ( ADC_Value < ghks.ADC_Alarm1 ) { // low alarm test
+            bTrigger = true ;
+            bTriggerLess = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x06 ) == 0x06  ){   // this is the always case
+                iMailMsg = 7 ;                                
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 11 ;                  
+              }else{
+                iMailMsg = 15 ;                  
+              }
+            }
+          }          
+        }
+      }
+      if ((( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ) || ( (( ghks.ADC_Alarm_Mode & 0x10 ) == 0x10 ) && bValveActive ) || ( (( ghks.ADC_Alarm_Mode & 0x20 ) == 0x20 ) && !bValveActive ))  {    // alarm 2 on 
+        if (( ghks.ADC_Alarm_Mode & 0x08 ) != 0 ){   // looking for a high alarm on number 2 else jump down for the low one
+          if ( ADC_Value > ghks.ADC_Alarm2 ) {       //  check the level
+            bTrigger = true ;      
+            bTriggerMore = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){  // this is the always active
+                iMailMsg = 6 ;                                
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 10 ;                  
+              }else{
+                iMailMsg = 14 ;                  
+              }
+            }
+          }          
+        }else{
+          if ( ADC_Value < ghks.ADC_Alarm2 ) {        // check the low alarm 
+            bTrigger = true ;
+            bTriggerLess = true ;
+            if (( ghks.ADC_Alarm_Mode & 0x30 ) == 0x30  ){   // this is the always active
+                iMailMsg = 8 ;     // alarm 2 always                           
+            }else{
+              if ( bValveActive ){
+                iMailMsg = 12 ;   // alarm 2 valve on               
+              }else{
+                iMailMsg = 16 ;   // alarm 2 valve off               
+              }
+            }
+          }          
+        }
+      }
+      
+      if ( bTrigger ) {
+        switch ( ghks.lFertActiveOptions ){           
+          case 1: if ( bTriggerMore ) bFertDisable = true ;  break ;      // greater than
+          case 2: if ( bTriggerLess ) bFertDisable = true ;  break ;      // less than
+          case 3: bFertDisable = true ;  break ;                          // Any  
+          default: bFertDisable = false ;  break ;                        // none  ie zero 0  
+        }
+        if (!bSentADCAlarmEmail) {
+          ADC_Trigger++ ;           
+        }               
+      }else{
+        ADC_Trigger = 0 ;      
+        iMailMsg = 0 ;
+        bFertDisable = false ;
+      }
+      if (ADC_Trigger > ghks.ADC_Alarm_Delay) {
+        if ( !bSentADCAlarmEmail ){
+          if ( iMailMsg != 0 ){
+            SendEmailToClient(iMailMsg) ;
+          }
+          bSentADCAlarmEmail = true ;
+        }  
+      }
+    }else{
+      ADC_Trigger = 0 ;
+      iMailMsg = 0 ;
+      bSentADCAlarmEmail = false ;
+    }
+  } else{                        // end of the once per second stuff
+    if ( bSendTestEmail ){
+      SendEmailToClient(-1) ;
+      bSendTestEmail = false ;
+    }    
+    if ( bSendSaveConfirm ) {
+      if (WiFi.isConnected()){
+        if (SMTP.bUseEmail && SMTP.bSpare ){   // using email and confirming changes
+          SendEmailToClient(-4);               // email save confimation to eeprom
+        }
+        bSendSaveConfirm = false ;
+      }
+    }    
   }                         // end of the once per second stuff
 
   if (rtc_hour != hour()){
+    if (( bSentADCAlarmEmail ) && ( hour() == 0 )){
+      bSentADCAlarmEmail = false ;
+      ADC_Trigger = 0 ; 
+    }
+    
     bSendCtrlPacket = true ;
     if ( !bConfig ) { // ie we have a network
       sendNTPpacket(ghks.timeServer); // send an NTP packet to a time server  once and hour
@@ -825,7 +1310,92 @@ long lTD ;
     rtc_hour = hour();
   }
   if ( rtc_min != minute()){
+    bSendCtrlPacket = true ;    
     lMinUpTime++ ;
+    if (  iDisplayCountDown > 1  )  //  decrement display saver
+       iDisplayCountDown-- ;
+       
+    if (( lMinUpTime == 15 ) && SMTP.bUseEmail ) {
+      SendEmailToClient(-2);                         // email that reboot just occureed  
+    }
+    
+    iAutoResetStatus = 0 ;
+    if (  ghks.SelfReBoot > 0 ) {
+      iAutoResetStatus = 1 ;
+      if ( lMinUpTime > MIN_REBOOT ) {
+        iAutoResetStatus = 2 ;
+        if ( lMinUpTime == ghks.SelfReBoot  ) {
+          iAutoResetStatus = 3 ;
+          if ( SMTP.bUseEmail ){
+            SendEmailToClient(-3);                           // email intention to reboot on minute before you pull the pin
+          }
+        }
+        if ( lMinUpTime > ghks.SelfReBoot ) {
+          IndicateReboot() ;
+        }
+      }
+    }
+    NowTime = now() + 60 ;
+    i = ( hour(NowTime) * 100 ) + minute(NowTime) ;
+    iHM = ( hour() * 100 ) + minute() ;
+    iRebootTime = ghks.lRebootTimeDay & 0xfff ;
+    iDOW = dayOfWeek(now()) ;
+    if (( ghks.lRebootTimeDay & 0x80000 ) != 0 ) {   // enabled and the right day
+      iAutoResetStatus = -1 ;
+      if (( ghks.lRebootTimeDay & ( 0x1000 << ( iDOW - 1))) != 0 )   {
+        iAutoResetStatus = -2 ;
+        if ( lMinUpTime > MIN_REBOOT ) { 
+          if (iRebootTime == 0 ){
+            if ( iHM == 2359 ) {
+              iAutoResetStatus = 3 ;
+              if (SMTP.bUseEmail){
+                SendEmailToClient(-3);                         // email intention to reboot on minute before you pull the pin
+              }
+            }         
+          }else{
+            if (i == iRebootTime ){
+              iAutoResetStatus = -3 ;
+              if (SMTP.bUseEmail){
+                SendEmailToClient(-3);                         // email intention to reboot on minute before you pull the pin
+              }
+            }          
+          }
+          if (iRebootTime == iHM ){
+            IndicateReboot() ;
+          }
+        }
+      }
+    }
+    if (iValveLogTTG>0){
+      iValveLogTTG -- ;
+    }
+    if ( lMinBusScan > 0 ) {
+      lMinBusScan -- ;
+    }
+    if (lMinBusScan == 0 ) {
+      if (SMTP.iBusScanInterval>0) {
+        iBusReturn = i2cBusCheck();
+        if (( iBusReturn != 0 ) && bBusGood ){
+          if ( SMTP.bUseEmail ) {
+            SendEmailToClient(666); 
+          }
+          bBusGood = false ;
+        }
+        if ( SMTP.iBusScanInterval < MINBUSSCANINTERVAL ){
+          lMinBusScan = MINBUSSCANINTERVAL ;          
+        }else{
+          lMinBusScan = SMTP.iBusScanInterval ;          
+        }
+      }
+    }
+    
+    if ((ghks.ValveLogOptions & 0x80 )!=0 ){
+      UpDateValveLogs();
+    }
+    if ((ghks.ValveLogOptions & 0x40 )!=0 ){
+      bDoFertUpload = true ;
+    }
+    
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( vvalve[i].lATTG > 0 ){
         vvalve[i].lATTG -- ;
@@ -864,7 +1434,8 @@ long lTD ;
   }
 
   if (bSendCtrlPacket){
-    sendCTRLpacket(ghks.RCIP) ;
+    sendCTRLpacket() ;
+    bSendCtrlPacket = false ;
   }
   if (lTimePrev > ( lTime + 100000 )){ // Housekeeping --- has wrapped around so back to zero
     lTimePrev = lTime ; // skip a bit 
@@ -877,7 +1448,10 @@ long lTD ;
 //  dnsServer.processNextRequest();
   snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
   if ( !bPrevConnectionStatus && WiFi.isConnected() ){
-      Serial.println(String(buff )+ " WiFi Reconnected OK...");  
+     Serial.println(String(buff )+ " WiFi Reconnected OK...");  
+     MyIP =  WiFi.localIP() ;
+     snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);            
+     Serial.println(buff);      
   }
   if (!WiFi.isConnected())  {
     lTD = (long)lTimeNext-(long) millis() ;
@@ -908,7 +1482,22 @@ long lTD ;
   }else{
     bPrevConnectionStatus = true ;
   }  
-
+  
+  if( !bButton ){
+    if ( digitalRead(0) == true ){
+      if ( iDisplayCountDown == 0 ){
+        iDisplayCountDown = 60 ;   // turn on display
+      }else{
+        iDisplayCountDown = 0 ;   // turn off display
+      }
+      bButton = true ;
+    }
+  }else{
+    if ( digitalRead(0) == false ){
+      bButton = false ;
+    }
+  }
+  
 }   //  ################### BOTTOM OF LOOP ########################
 
 

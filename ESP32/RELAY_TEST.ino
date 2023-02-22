@@ -79,7 +79,7 @@ void handleVSSS(){
   String MyColor ;
   String MyColor2 ;
   byte mac[6];
- 
+  long timediff ;
 
   SerialOutParams();
   
@@ -155,6 +155,34 @@ void handleVSSS(){
   message = F("</table>") ;
   server.sendContent(message) ;
 
+
+  message = F("<br><b>CNC Node Status</b><br><table border=1 title='CNC Node Status'>") ;
+  message += F("<tr><th>Record</th><th>Node</th><th>RSSI</th><th>SNR</th><th>RX Time</th><th>Total</th><th>Uplinked</th></tr>") ; 
+  server.sendContent(message) ;
+  message = "" ;
+  for (i = 0 ; i < MAX_REM_LIST ; i++ ) {   // enumerate the remote nodes list
+    if ( remlist[i].node > -1 ){
+      timediff = abs(remlist[i].rxt - now());
+      MyColor = F("");
+      if ( timediff > 600 ) {
+        MyColor = F("bgcolor=red") ;
+      }else{
+        MyColor = F("bgcolor=green") ;
+      }
+      message += "<tr><td >"+String(i)+"</td>";         
+      message += "<td>" + String(remlist[i].node) + "</td>";
+      message += "<td>" + String(remlist[i].Rssi) + "</td>";
+      message += "<td>" + String(remlist[i].Snr,1) + "</td>";
+      snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(remlist[i].rxt), month(remlist[i].rxt), day(remlist[i].rxt) , hour(remlist[i].rxt), minute(remlist[i].rxt), second(remlist[i].rxt));              
+      message += "<td align=center "+String(MyColor)+">" + String(buff) + "</td>";
+      message += "<td>" + String(remlist[i].total) + "</td>";
+      message += "<td>" + String(remlist[i].uplinked) + "</td><tr>";
+    }
+    server.sendContent(message) ;
+    message = "" ;
+  }
+  message = F("</table>") ;
+  server.sendContent(message) ;
   SendHTTPPageFooter();  
 }
 

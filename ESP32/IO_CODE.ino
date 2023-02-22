@@ -31,14 +31,14 @@ int j ;
       }
     break;
     case 1:  // MCP23017
-//      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
+      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
       for ( ii = 0 ; ii < MAX_MCP23017 ; ii ++ ) { // scan all the possible port expanders
 //        Serial.println("eboard.address " + String(eboard[Board].Address) + " Physical " + String(mcp[ii].getaddress())  ) ;
         if (eboard[Board].Address == ( mcp[ii].getaddress() + 0x20) ){
           k = ii ;
         }
       }
-      Serial.println("Board Array Address " + String(k));
+//      Serial.println("Board Array Address " + String(k));
       if ( k != -1 ){  // make sure the address is valid
         switch (eboard[Board].Translate ){
           case 0:  // no translation
@@ -57,7 +57,7 @@ int j ;
       }
     break;
     case 2:  // LOCAL I/O
-      if (( elocal.IOPin[Bit] > 0 ) && ( elocal.IOPin[Bit] < 17)){
+      if (( elocal.IOPin[Bit] > 0 ) && ( elocal.IOPin[Bit] < MAX_LOCAL_IO)){
         if ( PulseTime < 0 ){
           digitalWrite(elocal.IOPin[Bit],State) ;          
         }else{
@@ -123,7 +123,7 @@ bool bRet ;
       }
     break;
     case 2:  // LOCAL I/O
-      if (( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < 17)){
+      if (( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MAX_LOCAL_IO)){
         bRet = !digitalRead(elocal.IOPin[Bit]) ;          
       }
     break;
@@ -135,7 +135,7 @@ bool bRet ;
 
 
 void ioLocalMap() {
-  int i , ii ;
+  int i , ii , x ;
   uint8_t j , k , kk ;
   uint8_t BoardBit ;
   String message ;  
@@ -143,14 +143,14 @@ void ioLocalMap() {
   String pinname ;
   
   for (uint8_t j=0; j<server.args(); j++){
-    for ( ii = 0 ; ii < 17 ; ii++){                              // handle all the filter control arguments
+    for ( ii = 0 ; ii < MAX_LOCAL_IO ; ii++){                              // handle all the filter control arguments
       i = String(server.argName(j)).indexOf("i" + String(ii));
       if (i != -1){                                     
         k = String(server.arg(j)).toInt() ;  // IO pin address
-        if (( k >= 0 ) && ( k <= 17 )){
+        if (( k >= 0 ) && ( k <= MAX_LOCAL_IO )){
           elocal.IOPin[ii] = k ;
         }else{
-          elocal.IOPin[ii] = 17 ;
+          elocal.IOPin[ii] = MAX_LOCAL_IO ;
         }
       }      
     }
@@ -170,27 +170,10 @@ void ioLocalMap() {
       }else{
         bgcolor = "";            
       }
-      switch(ii){
-        case 0: pinname = F("GPIO 0 - D3") ; break;
-        case 1: pinname = F("GPIO 1 - D1 TXD0") ; break;
-        case 2: pinname = F("GPIO 2 - D9") ; break;
-        case 3: pinname = F("GPIO 3 - D0 - RXD0") ; break;
-        case 4: pinname = F("GPIO 4 - I2C SDA - Dont Use") ; break;
-        case 5: pinname = F("GPIO 5 - I2C SCL - Dont Use") ; break;
-        case 6: pinname = F("GPIO 6 - SDCLK - NA Dont Use") ; break;
-        case 7: pinname = F("GPIO 7 - SDD0 - NA Dont Use") ; break;
-        case 8: pinname = F("GPIO 8 - SDD1 - NA Dont Use") ; break;
-        case 9: pinname = F("GPIO 9 - SDD2 - NA ? ") ; break;
-        case 10: pinname = F("GPIO 10 - SDD3 - NA ? ") ; break;
-        case 11: pinname = F("GPIO 11 - SDCMD - NA Dont Use") ; break;
-        case 12: pinname = F("GPIO 12 - D12 - ") ; break;
-        case 13: pinname = F("GPIO 13 - D11 - RXD2") ; break;
-        case 14: pinname = F("GPIO 14 - D13") ; break;
-        case 15: pinname = F("GPIO 15 - D10 -  TXD2") ; break;
-        case 16: pinname = F("GPIO 16 - D2 -  Wake") ; break;
-        case 17: pinname = F("- UNUSED -") ; break;
+      pinname = strPINName(ii,&x,1) ;  // look for digital pins
+      if ( x == 0 ){
+        message += "<option value="+String(ii)+ bgcolor +">" + pinname + String(ii) ;          
       }
-      message += "<option value="+String(ii)+ bgcolor +">" + pinname + String(ii) ;          
     }
     server.sendContent(message);
     server.sendContent(F("</select></td><td><input type='submit' value='SET'></form></td></tr>"));
@@ -384,4 +367,115 @@ void ioScan() {
 //  server.sendContent(F("<br><a href='/scan'>I2C Scan</a><br><a href='/'>Home</a></body></html>\r\n"));
 }
 
+
+String strPINName(int iPin,int *iTmp,int iPinType)
+{
+  *iTmp = 0 ;
+  String pinname = "" ;
+  switch(iPinType){
+    case 1:   // digital pins
+#if defined(ESP32)
+      switch(iPin){
+        case 0: pinname = F("GPIO 0 DIO") ; break;
+        case 5: pinname = F("GPIO 5 DIO") ; break;
+        case 12: pinname = F("GPIO 12 DIO") ; break;
+        case 13: pinname = F("GPIO 13 DIO") ; break;
+        case 14: pinname = F("GPIO 14 DIO") ; break;
+        case 16: pinname = F("GPIO 16 DIO") ; break;
+        case 17: pinname = F("GPIO 17 DIO") ; break;
+        case 18: pinname = F("GPIO 18 DIO") ; break;
+        case 19: pinname = F("GPIO 19 DIO") ; break;
+        case 23: pinname = F("GPIO 23 DIO") ; break;
+        case 25: pinname = F("GPIO 25 DIO") ; break;
+        case 26: pinname = F("GPIO 26 DIO") ; break;
+        case 27: pinname = F("GPIO 27 DIO") ; break;
+        default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
+      }
+#elif defined(ESP8266)
+      switch(ii){
+        case 0: pinname = F("GPIO 0 - D3") ; break;
+        case 1: pinname = F("GPIO 1 - D1 TXD0") ; break;
+        case 2: pinname = F("GPIO 2 - D9") ; break;
+        case 3: pinname = F("GPIO 3 - D0 - RXD0") ; break;
+        case 4: pinname = F("GPIO 4 - I2C SDA - Dont Use") ; break;
+        case 5: pinname = F("GPIO 5 - I2C SCL - Dont Use") ; break;
+        case 6: pinname = F("GPIO 6 - SDCLK - NA Dont Use") ; break;
+        case 7: pinname = F("GPIO 7 - SDD0 - NA Dont Use") ; break;
+        case 8: pinname = F("GPIO 8 - SDD1 - NA Dont Use") ; break;
+        case 9: pinname = F("GPIO 9 - SDD2 - NA ? ") ; break;
+        case 10: pinname = F("GPIO 10 - SDD3 - NA ? ") ; break;
+        case 11: pinname = F("GPIO 11 - SDCMD - NA Dont Use") ; break;
+        case 12: pinname = F("GPIO 12 - D12 - ") ; break;
+        case 13: pinname = F("GPIO 13 - D11 - RXD2") ; break;
+        case 14: pinname = F("GPIO 14 - D13") ; break;
+        case 15: pinname = F("GPIO 15 - D10 -  TXD2") ; break;
+        case 16: pinname = F("GPIO 16 - D2 -  Wake") ; break;
+        default: pinname = F("- UNUSED -") ; *iTmp = 1  ; break;
+      }
+#endif      
+    break;
+    default:  // analog pins
+#if defined(ESP32)
+      switch(iPin){
+        case 2: pinname = F("GPIO 2 ADC") ; break;
+        case 4: pinname = F("GPIO 4 ADC") ; break;
+        case 34: pinname = F("GPIO 34 ADC") ; break;
+        case 35: pinname = F("GPIO 35 ADC") ; break;
+        case 36: pinname = F("GPIO 36 ADC") ; break;
+        case 39: pinname = F("GPIO 39 ADC") ; break;
+        default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
+      }
+#elif defined(ESP8266)
+        case 0: pinname = F("ADC") ; break;
+        default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
+#endif      
+    break;
+  }
+  return(pinname);
+}
+
+void ResetADCCalInfo(){
+  int i ,j ; 
+  sprintf(ghks.ADC_Unit,"kPa\0") ;
+  ghks.ADC_Cal_Ofs = -170.0 ;
+  ghks.ADC_Cal_Mul = 640.0 ;
+  ghks.ADC_Alarm_Mode = 0 ;               // high low etc
+  ghks.ADC_Alarm1 = 0 ;
+  ghks.ADC_Alarm2 = 0 ;                   // 
+  ghks.ADC_Input_PIN1 = 25 ;
+  ghks.ADC_Input_PIN2 = 26 ;  
+  ghks.ADC_Alarm_Delay = 60 ; 
+
+  for ( i = 0 ; i < ADC_MAX_CHAN ; i++ ) {
+    adcs.chan[i].ADC_RAW = 0 ;
+    adcs.chan[i].ADC_Value = 0 ;
+    adcs.chan[i].ADC_Cal_Mul = 1.0 ;
+    adcs.chan[i].ADC_Cal_Ofs = 0.0 ;
+    sprintf(adcs.chan[i].ADC_Unit , "kPa\0") ;      // units for display
+//    adcs.chan[i].ADC_Alarm_Mode[j] = 0 ;
+//    adcs.chan[i].ADC_Alarm[j] = 0 ;
+//    adcs.chan[i].ADC_Alarm_Delay[j] = 60 ;
+    switch(i){
+      case 0:
+        adcs.chan[i].ADC_Input_PIN = 2 ;
+      break;
+      case 1:
+        adcs.chan[i].ADC_Input_PIN = 4 ;
+      break;
+      case 2:
+        adcs.chan[i].ADC_Input_PIN = 35 ;
+      break;
+      case 3:
+        adcs.chan[i].ADC_Input_PIN = 34 ;
+      break;
+      case 4:
+        adcs.chan[i].ADC_Input_PIN = 36 ;
+      break;
+      default:  // 39 etc
+        adcs.chan[i].ADC_Input_PIN = 39 ;
+      break;
+    }
+  }  
+  Serial.println(F("*** ResetADCInfo Called ***"));  
+}
 

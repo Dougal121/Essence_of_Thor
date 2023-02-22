@@ -17,7 +17,7 @@ uint8_t fbit , board ;
        if ( evalve[i].Fertigate != 0 ){                                                                  // check if switched on first
           for ( j = 0 ; j < MAX_FERT ; j++){
             if (((evalve[i].Fertigate & ( 0x01 << j )) != 0 ) && ( efert[j].CurrentQty > 0 )) {          // check which fertigation channels are active
-              if ((( efert[j].DaysEnable & ( 0x01 << (k-1) )) != 0  ) && (( efert[j].DaysEnable & ( 0x80 )) != 0  )) {   // check if enabled for these days
+              if ((( efert[j].DaysEnable & ( 0x01 << (k-1) )) != 0  ) && (( efert[j].DaysEnable & ( 0x80 )) != 0  ) && !bFertDisable ) {   // check if enabled for these days
                 vfert[j].Flowrate += evalve[i].Flowrate ;                                                // work out the total flow rate 
                 vfert[j].bRun = true ;    
                 if ((efert[j].AType & 0xC0 ) != 0 ) {                                                    // if a chemical valve see what channel has the pump and keep it enabled
@@ -42,7 +42,7 @@ uint8_t fbit , board ;
       board = ( efert[j].BoardBit & 0xf0 ) >> 4 ;
       fbit = ( efert[j].BoardBit & 0x0f ) ;
       if ( vfert[j].bRun ) {
-        if (( efert[j].DaysEnable & 0x80 ) != 0 ){             // if it is enabled then start output
+        if ((( efert[j].DaysEnable & 0x80 ) != 0 ) && !bFertDisable ){             // if it is enabled then start output
           if ( vfert[j].lTTG == 0 ) {                          // ie not in cycle
             if ( efert[j].BaseFlow > 0 ){
               vfert[j].lTTG = ( efert[j].OnTime * vfert[j].Flowrate / efert[j].BaseFlow ) + 1 ;
@@ -223,6 +223,23 @@ void handleFert(){
   SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 1:  // load values
+          LoadParamsFromEEPROM(true);
+//          Serial.println("Load from EEPROM");
+        break;
+        case 2: // Save values
+          LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
+//          Serial.println("Save to EEPROM");
+        break;
+        case 5: // Fertigation
+          iPage = 2 ;
+        break;
+      }
+    }    
     for ( ii = 0 ; ii < MAX_FERT ; ii++){                             // handle all the fertigation control arguments
       i = String(server.argName(j)).indexOf("xnum" + String(ii));  // this is a parser cheat
       if (i != -1){  // 
@@ -402,5 +419,61 @@ void handleFert(){
 
   SendHTTPPageFooter();  
 }
+
+
+void DisplayShowFertQue(){
+  int i , ii , iTmp , iX ;
+  uint8_t j , k , kk ;
+  String message ;  
+  String MyValves ;  
+  String MyColor ;
+  String MyColor2 ;
+
+  SerialOutParams();
+  
+  for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 333:  // zero all que
+          ZeroFertQue();
+        break;
+      }
+    }
+  }
+  
+  SendHTTPHeader();
+
+  message = F("<br><center><b>Fertigation Data Que</b><br><a href='/?command=333'>Zero/Reset Fertigation Data Que</a><br>\r\n");
+  message += F("<table border=1 title='Fertigation Data Que'>\r\n");
+  message += F("<tr><th>Log</th><th>Date</th><th>Tank</th><th>Valves</th><th>Amount</th></tr>\r\n");
+  server.sendContent(message);
+  message = "" ;
+  for (int i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+    if ( flq[i].RecDate != 0 ){
+      MyColor = F("bgcolor='orange'")  ;
+    }else{
+      MyColor = F("bgcolor='yellowgreen'")  ;      
+    }
+    snprintf(buff, BUFF_MAX, "%02d/%02d/%04d %02d:%02d:%02d", day(flq[i].RecDate), month(flq[i].RecDate), year(flq[i].RecDate), hour(flq[i].RecDate), minute(flq[i].RecDate), second(flq[i].RecDate) );     
+    MyValves = String(flq[i].Valves,BIN) + " - " + String(flq[i].Valves) ;
+    server.sendContent( "<tr><td "+MyColor+">"+String(i)+"</td><td>"+String(buff)+"</th><th>"+flq[i].FertMixID+"</th><th>"+MyValves+"</th><th>"+flq[i].Amount+"</th></tr>\r\n");
+  }
+  server.sendContent(F("</table>\r\n"));    
+  SendHTTPPageFooter();
+
+}
+
+void ZeroFertQue(void){
+int i ;
+  for (i = 0 ; i < MAX_FERT_LOGS ; i++ ) {
+    flq[i].RecDate = 0 ;
+    flq[i].FertMixID = 0 ;
+    flq[i].Valves = 0 ;
+    flq[i].Amount = 0 ;
+  }
+  return ;
+}
+
 
 

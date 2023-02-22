@@ -17,39 +17,56 @@ String message ;
 }
 
 void SendHTTPHeader(){
+String message ;
+String strTmp = "" ;
   server.sendHeader(F("Server"),F("ESP32-on-beetle-juice"),false);
   server.sendHeader(F("X-Powered-by"),F("Dougal-filament-7"),false);
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
-  server.sendContent(F("<!DOCTYPE HTML>"));
-  server.sendContent("<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>");
-  server.sendContent(F("<meta name=viewport content='width=320, auto inital-scale=1'>"));
-  server.sendContent(F("</head><body><html><center><h3>"));   
-  server.sendContent("<a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a></h3>");
+  message = F("<!DOCTYPE HTML>");
+  message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
+  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>");
+  message += F("</head><body><html><center><h3>");   
+  if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
+    strTmp = String(ADC_Value) + " " + String(ghks.ADC_Unit) ;
+  }else{
+    strTmp = "" ;
+  }  
+  message += String(WiFi.RSSI()) + " (dBm) <a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>\r\n";
+  server.sendContent(message) ;  
+  message = "" ;       
 }
 
 
 
 void SendHTTPPageFooter(){
-  server.sendContent(F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>")) ;         
-  server.sendContent(F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>")) ;   
-  server.sendContent(F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>")) ;     
-  server.sendContent("<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>");
-//  server.sendContent(F("<a href='/?command=668'>Save Fert Current QTY</a><br>"));
-  server.sendContent(F("<a href='/eeprom'>EEPROM Memory Contents</a><br>"));
-  server.sendContent(F("<a href='/setup'>Node Setup</a><br>"));
-  server.sendContent(F("<a href='/info'>Node Infomation</a><br>"));
-  server.sendContent(F("<a href='/btest'>Relay Board Test</a><br>"));
-  server.sendContent(F("<a href='/vsss'>view volatile memory structures</a><br>"));
+  String message = F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>\r\n") ;         
+  message += F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>\r\n") ;   
+  message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
+  message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>\r\n" ;
+  message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>\r\n") ;
+  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
+  message += F("<a href='/setup'>Node Setup</a><br>\r\n");
+  message += F("<a href='/email'>Email Setup</a><br>\r\n");  
+  message += F("<a href='/adc'>ADC Setup</a><br>\r\n");  
+  message += F("<a href='/info'>Node Infomation</a><br>\r\n");
+  server.sendContent(message) ;  
+  message = "" ;       
+  message += F("<a href='/btest'>Relay Board Test</a><br>\r\n");
+  message += F("<a href='/vsss'>view volatile memory structures</a><br>\r\n");
   if ((MyIP[0]==0)&&(MyIP[1]==0)&&(MyIP[2]==0)&&(MyIP[3]==0)) {
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
   }else{
     snprintf(buff, BUFF_MAX, "%u.%u.%u.%u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
   }
-  server.sendContent("<a href='http://" + String(buff) + "/update'>OTA Firmware Update</a><br>");  
-  server.sendContent("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>");  
-  server.sendContent("<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br>");  
-  server.sendContent(F("</body></html>\r\n"));
+  message += "<a href='http://" + String(buff) + "/update'>OTA Firmware Update</a><br>\r\n" ;  
+  message += F("<a href='https://github.com/Dougal121/Essence_of_Thor'>Source at GitHub</a><br>\r\n") ;  
+  message += "<a href='http://" + String(buff) + "/backup'>Backup / Restore Settings</a><br><br>\r\n" ;  
+  snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
+  message += "Computer Uptime <b>"+String(buff)+"</b> (day:hr:min) <br>\r\n" ;  
+  message += F("</body></html>\r\n\r\n") ;
+  server.sendContent(message) ;  
+  message = "" ;       
 }
 
 
@@ -83,7 +100,7 @@ void handleRoot() {
   boolean bDefault = true ;
 //  int td[6];
   long lTmp ; 
-  String MyCheck , MyColor , MyNum , MyCheck2 ;
+  String MyCheck , MyColor , MyNum , MyCheck2 , MyCheck3 ;
   byte mac[6];
   String message ;
   tmElements_t tm;
@@ -111,6 +128,8 @@ void handleRoot() {
         break;
         case 2: // Save values
           LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
+
 //          Serial.println("Save to EEPROM");
         break;
         case 3: // valve setup
@@ -137,6 +156,16 @@ void handleRoot() {
             iTestMode = -1 ;            
           }
         break;
+        case 11:  // load values
+          bSendTestEmail = true ;
+        break;
+        case 121:
+          ResetSMTPInfo();
+        break;        
+        case 122:
+          ResetADCCalInfo();
+        break;   
+        
         case 667: // wipe the memory to factory default
           BackInTheBoxMemory();
         break;
@@ -288,9 +317,15 @@ void handleRoot() {
       }        
       i = String(server.argName(j)).indexOf("ncom" + MyNum);
       if (i != -1){  // Valve Control Node
-        evalve[ii].Valve =  String(server.arg(j)).toInt() ;
-//        Serial.println("Remote Valve Address" + String(evalve[ii].Valve) );  
-      }        
+        evalve[ii].Valve =  String(server.arg(j)).toInt() & 0x7f ;
+      }     
+      i = String(server.argName(j)).indexOf("ncul" + MyNum);
+      if (i != -1){  // Valve Control Node
+         if ( String(server.arg(j)).length() == 2 ){ // this relies on the one above coming first which it usu
+            evalve[ii].Valve += 0x80  ;
+         }
+      }     
+      
       i = String(server.argName(j)).indexOf("vsea" + MyNum);
       if (i != -1){  
         if ( String(server.arg(j)).toInt() == 0 ){
@@ -477,8 +512,8 @@ void handleRoot() {
     if (bExtraValve) {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
-        message += F("<th colspan=4>Control Options</th><th colspan=2>Remote</th><th>Flow</th><th colspan=3>On</th><th colspan=3>Off</th></tr>");      
-        message += F("<tr><th>Cascade</th><th>DW</th><th>MV</th><th>FB</th><th>Valve</th><th>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pulse</th></tr>") ; 
+        message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=4>On</th><th colspan=4>Off</th></tr>");      
+        message += F("<tr><th>Cascade</th><th title='Always On'>AO</th><th title='Domestic Water'>DW</th><th title='Master Valve'>MV</th><th title='Feed Back'>FB</th><th title='Send to Valve'>Valve</th><th title='Accept Uplink'>Rx</th><th title='Send to Node ID'>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th></tr>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
         message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;
@@ -532,6 +567,11 @@ void handleRoot() {
       }
       if (bExtraValve) {
         if (iPage == 1 ){
+          if (( evalve[i].TypeMaster & 0x200 ) != 0 ){   // always on program valve
+            MyCheck3 = F(" CHECKED") ;
+          }else{
+            MyCheck3 = "" ;       
+          }          
           if (( evalve[i].TypeMaster & 0x100 ) != 0 ){
             MyCheck2 = F(" CHECKED") ;
           }else{
@@ -548,12 +588,41 @@ void handleRoot() {
             MyColor = "" ;       
           }
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='3'><input type='hidden' name='vnum"+MyNum+"' value='"+String(i)+"'><td><input type='text' name='vdes"+MyNum+"' value='" + String(evalve[i].description) + "' maxlength=7 size=8></td>" ; 
-          message += "<td><input type='text' name='vmas"+MyNum+"' value='" + String((evalve[i].TypeMaster & 0x3f )) + "' maxlength=2 size=2></td><td><input type='checkbox' name='vtyd"+MyNum+"'"+ String(MyCheck2) + "></td><td><input type='checkbox' name='vtym"+MyNum+"'"+ String(MyCheck) + "></td><td><input type='checkbox' name='vtyf"+MyNum+"'"+ String(MyColor) + "></td>" ;
-          message += "<td><input type='text' name='ncom"+MyNum+"' value='" + String(evalve[i].Valve) + "' maxlength=3 size=2></td>";
+          message += "<td><input type='text' name='vmas"+MyNum+"' value='" + String((evalve[i].TypeMaster & 0x3f )) + "' maxlength=2 size=2></td><td><input type='checkbox' name='vtya"+MyNum+"'"+ String(MyCheck3) + "></td><td><input type='checkbox' name='vtyd"+MyNum+"'"+ String(MyCheck2) + "></td><td><input type='checkbox' name='vtym"+MyNum+"'"+ String(MyCheck) + "></td><td><input type='checkbox' name='vtyf"+MyNum+"'"+ String(MyColor) + "></td>" ;
+          message += "<td><input type='text' name='ncom"+MyNum+"' value='" + String(evalve[i].Valve & 0x7f ) + "' maxlength=3 size=2></td>";
+          if (( evalve[i].Valve & 0x80 ) != 0 ){  // f0 ????
+            MyColor = F(" CHECKED") ;
+          }else{
+            MyColor = "" ;       
+          }
+          message += "<td><input type='checkbox' name='ncul"+MyNum+"'"+ String(MyColor) + "></td>";          
           message += "<td><input type='text' name='ncon"+MyNum+"' value='" + String(evalve[i].Node) + "' maxlength=3 size=2></td>";
           message += "<td><input type='text' name='nflo"+MyNum+"' value='" + String(evalve[i].Flowrate) + "' maxlength=5 size=2></td>";
-          message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
-          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x0f )) + "' maxlength=3 size=2></td>" ; 
+          if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+            MyCheck = "<select name='vppon"+MyNum+"'><option value='0'>Pos<option value='1' SELECTED>Neg</select>" ;
+          }else{
+            MyCheck = "<select name='vppon"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
+          }
+          message += "<td><input type='text' name='vcon"+MyNum+"' value='" + String(evalve[i].OnCoilBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vaon"+MyNum+"' value='" + String((evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ) + "' maxlength=2 size=2></td><td>"+ MyCheck+"</td><td><input type='text' name='vpon"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x70 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
+/*          if ((evalve[i].OnOffPolPulse & 0x08) != 0 ){
+            MyCheck = "<select name='vppof"+MyNum+"'><option value='0'>Pos<option value='1' SELECTED>Neg</select>" ;
+          }else{
+            MyCheck = "<select name='vppof"+MyNum+"'><option value='0' SELECTED>Pos<option value='1'>Neg</select>" ;            
+          }*/
+          if (evalve[i].OnCoilBoardBit == evalve[i].OffCoilBoardBit ) { // if these are the same just show polarity as reversed
+            if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+              MyCheck = "Pos" ;
+            }else{
+              MyCheck = "Neg" ;
+            }            
+          }else{
+            if ((evalve[i].OnOffPolPulse & 0x80) != 0 ){
+              MyCheck = "Neg" ;
+            }else{
+              MyCheck = "Pos" ;
+            }            
+          }
+          message += "<td><input type='text' name='vcof"+MyNum+"' value='" + String(evalve[i].OffCoilBoardBit & 0x0f) + "' maxlength=3 size=2></td><td><input type='text' name='vaof"+MyNum+"' value='" + String((evalve[i].OffCoilBoardBit & 0xf0 ) >> 4) + "' maxlength=3 size=2></td><td>"+MyCheck+"</td><td><input type='text' name='vpof"+MyNum+"' value='" + String((evalve[i].OnOffPolPulse & 0x07 )) + "' maxlength=3 size=2></td>" ; 
         }else{
           message += "<form method=post action=" + server.uri() + "><input type='hidden' name='command' value='4'><td><input type='text' name='vfbt"+MyNum+"' value='" + String(evalve[i].FeedbackBoardBit & 0x0f ) + "' maxlength=3 size=2></td><td><input type='text' name='vfad"+MyNum+"' value='" + String((evalve[i].FeedbackBoardBit & 0xf0 ) >> 4 ) + "' maxlength=3 size=2></td>" ;
           for (k = 0 ; ( k < 8 ) && ( k < MAX_FERT ) ; k++){      
@@ -588,6 +657,7 @@ void handleRoot() {
   }
 
   SendHTTPPageFooter();
-
 }
+
+
 
