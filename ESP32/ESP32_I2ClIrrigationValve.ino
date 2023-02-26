@@ -67,7 +67,7 @@ uEEPROMLib rtceeprom(0x57);
 #define LineText     0
 #define Line        12
 
-#define MAX_LOCAL_IO 39
+#define MAX_LOCAL_IO 16    // same a sa relay board
 
 #if defined(ESP32)
 #define MaxPinPort  40
@@ -82,6 +82,7 @@ uEEPROMLib rtceeprom(0x57);
 #define ADC_MAX_ALARM ADC_MAX_CHAN * 4
 
 #define MINBUSSCANINTERVAL 5  // minimum bus scan time in minutes
+#define MINLORASCANINTERVAL 5  // minimum LoRa scan time in minutes
 
 #include "StaticPages.h"
 
@@ -233,7 +234,7 @@ typedef struct __attribute__((__packed__)) {                        // Permanent
 } board_t ;
 
 typedef struct __attribute__((__packed__)) {                        // Permanent record
-  uint8_t IOPin[16];
+  uint8_t IOPin[MAX_LOCAL_IO];
 } local_t ;
 
 typedef struct __attribute__((__packed__)) {           //  new programming system closer to what THOR is / does
@@ -368,14 +369,19 @@ typedef struct __attribute__((__packed__)) {
   int16_t      crc ;
 } cnc_ack_t ;                        // 28 bytes
 
+cnc_ack_t cnc_ack;
+
 typedef struct __attribute__((__packed__)) {
   int          node ;
-  int          Rssi ;
-  float        Snr ;
+  int          RxRssi ;
+  float        RxSnr ;
+  int          TxRssi ;
+  float        TxSnr ;
   time_t       txt ;
   time_t       rxt ;
-  uint8_t      total ;        // 
+  uint8_t      total ;           // 
   uint8_t      uplinked ;        // number acted on
+  long         TotalPackets ;
 } cnc_nodes_t ;                  // 12 bytes
 
 cnc_nodes_t   remlist[MAX_REM_LIST] ;
@@ -397,6 +403,8 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   bool bSpare ;
   int  iBusScanInterval ;
   int  iBusState[8] ; // 16 x 8 bits of bus state
+  int  iLoRaScanInterval ;
+  int  iLoRaTimeOut ;       // seconds > 120
 } Email_App_stuff_t ;          
 
 Email_App_stuff_t SMTP;
@@ -448,6 +456,7 @@ float LoRaLastSnr = 0 ;
 long LoRaLastFrequencyError = 0 ; 
 long LoRaTxPCnt = 0 ;
 long LoRaRxPCnt = 0 ;
+bool bSendLoRaCNCACK = false ;
 bool bDoTimeUpdate = false ;
 bool bSendTestEmail = false ;
 bool bSendSaveConfirm = false ;
@@ -461,6 +470,7 @@ long lTimePrev ;
 long lTimePrev2 ;
 long lMinUpTime = 0 ;
 long lMinBusScan = 30 ;
+long lMinLoRaScan = 10 ;
 long lRet_Email = 0 ;
 float ADC_Value = 0 ;
 int   ADC_Raw1 = 0 ; 
@@ -469,12 +479,13 @@ bool  bSentADCAlarmEmail = false ;
 long ADC_Trigger = 0 ;
 int   iAutoResetStatus = 0 ; 
 bool bBusGood = true ;
+bool bLoRaGood = true ;
 bool bFertDisable = false ;
 bool bLoRa = false ; 
 bool bButton = false ;
 int  iDisplayCountDown = 0 ;
 String strBusResults ;
-
+String strLoRaResults ;
 WiFiUDP ntpudp;
 WiFiUDP ctrludp;
 WebServer server(80);
@@ -619,13 +630,15 @@ int i , k , j = 0;
         }  
       break;
       case 2:  // Local I/O Pins
-/*          for (j = 0 ; j < 16 ; j++ ){  // for the 16 bits
-            if (CheckIfMCPInput(i,j)){
-              mcp[k].pinMode(j, INPUT);
-            }else{
-              mcp[k].pinMode(j, OUTPUT);                
+          for (j = 0 ; j < MAX_LOCAL_IO ; j++ ){  // for the 16 bits
+            if (( elocal.IOPin[j] != 255 ) && ( elocal.IOPin[j] >= 0 ) && (LocalPINOK(elocal.IOPin[j]))){       // look at this for use
+              if (CheckIfMCPInput(i,j)){
+                pinMode(elocal.IOPin[j], INPUT);
+              }else{
+                pinMode(elocal.IOPin[j], OUTPUT);                
+              }
             }
-          }*/
+          }
       break;
       case 3:  // None
       break ;
@@ -770,7 +783,7 @@ int i , k , j = 0;
   server.on("/fertque", DisplayShowFertQue);  
   server.on("/iolocal", ioLocalMap);
   server.on("/adc", adcLocalMap);
-  server.on("/eeprom", DisplayEEPROM);
+//  server.on("/eeprom", DisplayEEPROM);
   server.on("/valvelog",DisplayValveLog);
   server.on("/valvelog.csv", HTTP_GET , DisplayValveLog);  
   server.on("/backup", HTTP_GET , handleBackup);
@@ -879,6 +892,7 @@ int iRebootTime = 0 ;
 time_t NowTime ;
 
 int iBusReturn = 0 ;
+int iLoRaReturn = 0 ;
 
 
   server.handleClient();
@@ -927,6 +941,14 @@ int iBusReturn = 0 ;
     display.drawString(127 , LineText, String(WiFi.RSSI()));
 
     if ( bBusGood ){
+      if ( bLoRaGood ){
+      }else{
+        display.drawString(127 , 42, String("-LoRa-"));    
+        if (( rtc_sec % 2 ) == 0 ){
+          display.setColor(INVERSE);
+          display.fillRect(95, 42, 32, 12);
+        }        
+      }
     }else{
       display.drawString(127 , 42, String("-BUS-"));    
       if (( rtc_sec % 2 ) == 0 ){
@@ -971,7 +993,11 @@ int iBusReturn = 0 ;
       break;  
       case 7:
         if ( bLoRa ){
-          snprintf(buff, BUFF_MAX, "LaPa RSSI %d SNR %.1f FE %d",LoRaLastRssi,LoRaLastSnr , LoRaLastFrequencyError );          
+          if ( bLoRaGood ){
+            snprintf(buff, BUFF_MAX, "LaPa RSSI %d SNR %.1f FE %d",LoRaLastRssi,LoRaLastSnr , LoRaLastFrequencyError );          
+          }else{
+            snprintf(buff, BUFF_MAX, "LoRa %s", strLoRaResults.c_str() );
+          }
         }else{
           snprintf(buff, BUFF_MAX, "### LoRa Offline ###" );          
         }
@@ -1388,7 +1414,25 @@ int iBusReturn = 0 ;
         }
       }
     }
-    
+    if ( lMinLoRaScan > 0 ) {
+      lMinLoRaScan -- ;
+    }
+    if (lMinLoRaScan == 0 ) {
+      if (SMTP.iLoRaScanInterval>0) {
+        iLoRaReturn = LoRaCheck();
+        if (( iLoRaReturn != 0 ) && bLoRaGood ){
+          if ( SMTP.bUseEmail ) {
+            SendEmailToClient(668); 
+          }
+          bLoRaGood = false ;
+        }
+        if ( SMTP.iLoRaScanInterval < MINLORASCANINTERVAL ){
+          lMinLoRaScan = MINLORASCANINTERVAL ;          
+        }else{
+          lMinLoRaScan = SMTP.iLoRaScanInterval ;          
+        }
+      }
+    }    
     if ((ghks.ValveLogOptions & 0x80 )!=0 ){
       UpDateValveLogs();
     }
@@ -1497,7 +1541,13 @@ int iBusReturn = 0 ;
       bButton = false ;
     }
   }
-  
+  if (( bLoRa ) && ( bSendLoRaCNCACK ) && (second() == ( ghks.lNodeAddress % 60 ))){
+    LoRa.beginPacket();
+    LoRa.write((byte *)&cnc_ack, sizeof(cnc_ack));   
+    LoRa.endPacket();  
+    bSendLoRaCNCACK = false ;  
+    Serial.println("LoRa CNC ACK packet sent at " + String(second()));          
+  }
 }   //  ################### BOTTOM OF LOOP ########################
 
 

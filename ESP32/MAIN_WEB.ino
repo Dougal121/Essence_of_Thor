@@ -45,7 +45,7 @@ void SendHTTPPageFooter(){
   message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
   message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>\r\n" ;
   message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>\r\n") ;
-  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
+//  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
   message += F("<a href='/setup'>Node Setup</a><br>\r\n");
   message += F("<a href='/email'>Email Setup</a><br>\r\n");  
   message += F("<a href='/adc'>ADC Setup</a><br>\r\n");  

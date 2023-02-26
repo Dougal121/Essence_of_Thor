@@ -120,6 +120,10 @@ bool bRoach = false ;
                 snprintf(csTemp,MESSAGE_MAX,"I2C Bus device(s) have changed state\r\n\0"  )  ;  
                 i = MAX_FERT ;
             break;
+            case 668:
+                snprintf(csTemp,MESSAGE_MAX,"LoRa Bus device(s) have not responded in a timely manner\r\n\0"  )  ;  
+                i = MAX_FERT ;
+            break;
             
             default: snprintf(csTemp,MESSAGE_MAX,"%s \0",SMTP.subject ) ; 
                 i = MAX_FERT ;
@@ -175,9 +179,13 @@ bool bRoach = false ;
         message.addBcc(String(SMTP.BCC ));
       }     
 
-      if (iMessageID == 666 ){
+      if (iMessageID == 666 ) {
         strcat(csTemp,strBusResults.c_str() ) ;  // if a buss alarm add this in
         strBusResults = "" ; // clear after sending
+      }
+      if (iMessageID == 668 ){
+        strcat(csTemp,strLoRaResults.c_str() ) ;  // if a buss alarm add this in
+        strLoRaResults = "" ; // clear after sending
       }
       if (ghks.lProgMethod == 0 ){
         snprintf(buff,BUFF_MAX,"\r\nMode By Valve \r\n\r\n\0" ) ;
@@ -329,6 +337,20 @@ void DisplayEmailSetup() {
       SMTP.iBusScanInterval = String(server.arg(j)).toInt() ;
       if (( SMTP.iBusScanInterval < MINBUSSCANINTERVAL ) && ( SMTP.iBusScanInterval > 0 )){
         SMTP.iBusScanInterval = MINBUSSCANINTERVAL ;
+      }
+    }
+    i = String(server.argName(j)).indexOf("lrsi");  // lora scan interval
+    if (i != -1){ 
+      SMTP.iLoRaScanInterval = String(server.arg(j)).toInt() ;
+      if (( SMTP.iLoRaScanInterval < MINLORASCANINTERVAL ) && ( SMTP.iLoRaScanInterval > 0 )){
+        SMTP.iLoRaScanInterval = MINLORASCANINTERVAL ;
+      }
+    }
+    i = String(server.argName(j)).indexOf("lrto");   // lora time out
+    if (i != -1){ 
+      SMTP.iLoRaTimeOut = String(server.arg(j)).toInt() ;
+      if (( SMTP.iLoRaTimeOut < 120 ) && ( SMTP.iLoRaTimeOut > 0 )){
+        SMTP.iLoRaTimeOut = 120 ;
       }
     }
     i = String(server.argName(j)).indexOf("lotk");
@@ -627,6 +649,8 @@ void DisplayEmailSetup() {
   message = "" ;    
 
   message += "<tr><form method=post action=" + server.uri() + "><td title='Bus Monitor -1 disables'>Bus Monitor Interval</td><td align=center><input type='text' name='bsci' value='"+String(SMTP.iBusScanInterval)+"' size=30></td></td><td>(min)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td title='LoRa Monitor -1 disables'>LoRa Monitor Interval</td><td align=center><input type='text' name='lrsi' value='"+String(SMTP.iLoRaScanInterval)+"' size=30></td></td><td>(min)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td title='LoRa Timeout Min 120 (s)'>LoRa TimeOut Interval</td><td align=center><input type='text' name='lrto' value='"+String(SMTP.iLoRaTimeOut)+"' size=30></td></td><td>(s)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   if ( ( SMTP.bUseEmail ) != 0 ){
     MyCheck = F("CHECKED")  ;    
   }else{
@@ -667,7 +691,9 @@ void ResetSMTPInfo(){
   SMTP.bUseEmail = false ;
   SMTP.LowTankQty = 50.0 ;   
   Serial.println(F("*** ResetSMTPInfo Called ***"));  
-
+  SMTP.iLoRaScanInterval = -1 ;
+  SMTP.iBusScanInterval = -1 ;
+  SMTP.iLoRaTimeOut = 120 ;
 }
 
 

@@ -57,13 +57,15 @@ int j ;
       }
     break;
     case 2:  // LOCAL I/O
-      if (( elocal.IOPin[Bit] > 0 ) && ( elocal.IOPin[Bit] < MAX_LOCAL_IO)){
-        if ( PulseTime < 0 ){
-          digitalWrite(elocal.IOPin[Bit],State) ;          
-        }else{
-          digitalWrite(elocal.IOPin[Bit],!State) ;
-          delay(PulseTime);          
-          digitalWrite(elocal.IOPin[Bit],State) ;          
+      if (( Bit < MAX_LOCAL_IO ) && ( LocalPINOK(elocal.IOPin[Bit]))){
+        if ((( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MaxPinPort)) && ( elocal.IOPin[Bit] != 255 ))   {
+          if ( PulseTime < 0 ){
+            digitalWrite(elocal.IOPin[Bit],State) ;          
+          }else{
+            digitalWrite(elocal.IOPin[Bit],!State) ;
+            delay(PulseTime);          
+            digitalWrite(elocal.IOPin[Bit],State) ;          
+          }
         }
       }
     break;
@@ -81,7 +83,11 @@ int MaxBoardOutputs(int Board){
       return(16);
     break;
     case 2:  // LOCAL I/O
+#if defined(ESP32)    
+      return(16);
+#elif defined(ESP8266)
       return(4);
+#endif           
     break;
     default: // 3 None
       return(0);
@@ -123,8 +129,10 @@ bool bRet ;
       }
     break;
     case 2:  // LOCAL I/O
-      if (( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MAX_LOCAL_IO)){
-        bRet = !digitalRead(elocal.IOPin[Bit]) ;          
+      if (( Bit < MAX_LOCAL_IO ) && ( LocalPINOK(elocal.IOPin[Bit]))) {
+        if (( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MaxPinPort) && ( elocal.IOPin[Bit] != 255 )){
+          bRet = !digitalRead(elocal.IOPin[Bit]) ;          
+        }
       }
     break;
     case 3: // None
@@ -134,23 +142,24 @@ bool bRet ;
 }
 
 
-void ioLocalMap() {
-  int i , ii , x ;
-  uint8_t j , k , kk ;
-  uint8_t BoardBit ;
+void ioLocalMap() {                                //  ##############  LOCAL IO MAP  ##########################
+  int i , ii , x , k ;
+  uint8_t j , kk ;
+  uint8_t BoardBit ; 
   String message ;  
   String bgcolor ;  
   String pinname ;
-  
+
+  SerialOutParams();  
   for (uint8_t j=0; j<server.args(); j++){
     for ( ii = 0 ; ii < MAX_LOCAL_IO ; ii++){                              // handle all the filter control arguments
       i = String(server.argName(j)).indexOf("i" + String(ii));
       if (i != -1){                                     
-        k = String(server.arg(j)).toInt() ;  // IO pin address
-        if (( k >= 0 ) && ( k <= MAX_LOCAL_IO )){
+        k = String(server.arg(j)).toInt() ;                                // IO pin address
+        if ((( k >= 0 ) && ( k <= MaxPinPort )) || ( k == 255 )){
           elocal.IOPin[ii] = k ;
         }else{
-          elocal.IOPin[ii] = MAX_LOCAL_IO ;
+          elocal.IOPin[ii] = MaxPinPort ;
         }
       }      
     }
@@ -160,26 +169,33 @@ void ioLocalMap() {
 
   server.sendContent(F("<br><center><b>Local Processor Pin I/O Map</b><br><table border=1 title='Local I/O Map'><tr><th>Bit</th><th>PIN</th><th>.</th></tr>"));
   
-  for (i = 0; i < 16 ; i++) {     // for each Bit allocate a local I/O pin against it
-    server.sendContent(F("<tr>"));
-    server.sendContent("<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='i"+String(i)+"'>");
-    message = "" ;
-    for (ii = 0; ii < 18; ii++) {
+  for (i = 0; i < MAX_LOCAL_IO ; i++) {     // for each Bit allocate a local I/O pin against it
+    message = F("<tr>");
+    message += "<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='i"+String(i)+"'>";
+    for (ii = 0 ; ii < MaxPinPort; ii++) {
       if (elocal.IOPin[i] == ii ){
         bgcolor = F(" SELECTED ");
       }else{
         bgcolor = "";            
       }
-      pinname = strPINName(ii,&x,1) ;  // look for digital pins
-      if ( x == 0 ){
-        message += "<option value="+String(ii)+ bgcolor +">" + pinname + String(ii) ;          
+      if (LocalPINOK(ii)){
+        pinname = strPINName(ii,&x,1) ;  // look for digital pins
+        if ( x == 0 ){
+          message += "<option value="+String(ii)+ bgcolor +">" + pinname + String(ii) ;          
+        }
       }
     }
+    if ( elocal.IOPin[i] == 255){
+      bgcolor = F(" SELECTED ");
+    }else{
+      bgcolor = "";            
+    }
+    message += "<option value=255 "+ bgcolor +">Not Connected " ;
+    message += F("</select></td><td><input type='submit' value='SET'></form></td></tr>\n\r");
     server.sendContent(message);
-    server.sendContent(F("</select></td><td><input type='submit' value='SET'></form></td></tr>"));
+    message = "" ;
   }
   server.sendContent(F("</table>"));
-//  server.sendContent(F("<br><a href='/'>Home</a></body></html>\r\n"));
   SendHTTPPageFooter();   
 }
 
@@ -389,10 +405,16 @@ String strPINName(int iPin,int *iTmp,int iPinType)
         case 25: pinname = F("GPIO 25 DIO") ; break;
         case 26: pinname = F("GPIO 26 DIO") ; break;
         case 27: pinname = F("GPIO 27 DIO") ; break;
+        case 2: pinname = F("GPIO 2 ADC") ; break;
+        case 4: pinname = F("GPIO 4 ADC") ; break;
+        case 34: pinname = F("GPIO 34 ADC") ; break;
+        case 35: pinname = F("GPIO 35 ADC") ; break;
+        case 36: pinname = F("GPIO 36 ADC") ; break;
+        case 39: pinname = F("GPIO 39 ADC") ; break;
         default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
       }
 #elif defined(ESP8266)
-      switch(ii){
+      switch(iPin){
         case 0: pinname = F("GPIO 0 - D3") ; break;
         case 1: pinname = F("GPIO 1 - D1 TXD0") ; break;
         case 2: pinname = F("GPIO 2 - D9") ; break;
@@ -426,8 +448,10 @@ String strPINName(int iPin,int *iTmp,int iPinType)
         default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
       }
 #elif defined(ESP8266)
+      switch(iPin){
         case 0: pinname = F("ADC") ; break;
         default: pinname = F("- UNKNOWN-") ; *iTmp = 1 ; break;
+      }  
 #endif      
     break;
   }
@@ -478,4 +502,25 @@ void ResetADCCalInfo(){
   }  
   Serial.println(F("*** ResetADCInfo Called ***"));  
 }
+
+bool LocalPINOK ( int iTest){
+bool bRet = false ;  
+  switch (iTest){
+    case 12:
+    case 13:
+    case 17:
+    case 23:
+    case 25:
+    case 34:
+    case 35:
+    case 36:
+    case 39:
+    case 2:
+    case -1:
+      bRet = true ;
+    break;
+  }
+  return(bRet);
+}
+
 

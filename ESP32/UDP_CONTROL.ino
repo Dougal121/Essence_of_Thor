@@ -44,15 +44,26 @@ cnc_t  cnc ;
         Serial.println("No WiFi for uplink ???");
       }      
       if ( bLoRa ){
-          Serial.println("Sending LoRa CNC packet " + String( sizeof(cnc))+ " bytes");
-          LoRa.beginPacket();
+        Serial.println("Sending LoRa CNC packet " + String( sizeof(cnc))+ " bytes");
+        LoRa.beginPacket();
 //          LoRa.print("test 123");
-          LoRa.write((byte *)&cnc, sizeof(cnc));   
-          LoRaLastRssi = LoRa.packetRssi();                             // Get RSSI
-          LoRaLastSnr = LoRa.packetSnr();
-          LoRaLastFrequencyError = LoRa.packetFrequencyError ();        
-          LoRa.endPacket();      
-          Serial.println("LoRa CNC packet send RSSI: " + String(LoRaLastRssi)+ " SNR "+String(LoRaLastSnr) + " FE " + String(LoRaLastFrequencyError));
+        LoRa.write((byte *)&cnc, sizeof(cnc));   
+//        LoRaLastRssi = LoRa.packetRssi();                             // Get RSSI
+//        LoRaLastSnr = LoRa.packetSnr();
+//        LoRaLastFrequencyError = LoRa.packetFrequencyError ();        
+        LoRa.endPacket();      
+        Serial.println("LoRa CNC packet sent");
+        for ( int j  = 0 ;  j < MAX_VALVE ; j++ ){
+          if (( evalve[j].Node != ghks.lNodeAddress ) && ( evalve[j].Node != 0 ) && (( evalve[j].Valve & 0x80 ) == 0x00 ) ) {       // && ( evalve[i].Valve != 0 )
+            for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                                                                             // setup the defaults in the remote nodes list
+              if (( remlist[i].node == evalve[j].Node ) || ( remlist[i].node == -1 )) {
+                remlist[i].txt =  now() ;     
+                remlist[i].node = evalve[j].Node ;       
+                i = MAX_REM_LIST ;     
+              }
+            }          
+          }
+        }
       }
     }
 }
@@ -100,7 +111,6 @@ cnc_t  cnc ;
 
 unsigned long DoLaRaStuff(){
 cnc_t  cnc ;  
-cnc_ack_t cnc_ack;
 int j ;
 int ii ;
 byte packetBuffer[16];
@@ -112,6 +122,7 @@ unsigned long timediff ;
     if (packetSize){
       Serial.println("Process Uplinked LoRa data " + String(packetSize) + " bytes");      
       if ( packetSize ==  sizeof(cnc_ack) ){
+        Serial.println("LoRa CNC ACK packet recieved RSSI: " + String(LoRa.packetRssi())+ " SNR "+String(LoRa.packetSnr()) + " FE " + String(LoRa.packetFrequencyError()));
         LoRa.readBytes((byte *)&cnc_ack, sizeof(cnc_ack));                                       // read the packet into the structure
         while (LoRa.available()){                                                                // clean out the rest of the packet and dump overboard
           LoRa.readBytes(packetBuffer, sizeof(packetBuffer));  
@@ -120,12 +131,15 @@ unsigned long timediff ;
           for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                 // setup the defaults in the remote nodes list
             if (( remlist[i].node = cnc_ack.snode ) || ( remlist[i].node = -1 )){
               remlist[i].node = cnc_ack.snode ;
-              remlist[i].Rssi =  cnc_ack.Rssi  ;
-              remlist[i].Snr = cnc_ack.Snr ;
+              remlist[i].TxRssi =  cnc_ack.Rssi  ;
+              remlist[i].TxSnr = cnc_ack.Snr ;
               remlist[i].txt =  cnc_ack.mc ;     
-              remlist[i].rxt =  cnc_ack.now() ;     
+              remlist[i].RxRssi =   LoRa.packetRssi()  ;
+              remlist[i].RxSnr =  LoRa.packetSnr() ;
+              remlist[i].rxt =  now() ;     
               remlist[i].total = cnc_ack.total ;
               remlist[i].uplinked = cnc_ack.uplinked ;   
+              remlist[i].TotalPackets++ ;
               i = MAX_REM_LIST ;                                  // exit as we have found the target  
             }
           }
@@ -133,6 +147,11 @@ unsigned long timediff ;
       }else{
         memset(&cnc, 0, sizeof(cnc));
         memset(&cnc_ack, 0, sizeof(cnc));
+        cnc_ack.Rssi = LoRa.packetRssi();        // start to build the ackknolode packet 
+        cnc_ack.Snr = LoRa.packetSnr();
+        cnc_ack.FE = LoRa.packetFrequencyError();
+        cnc_ack.snode = ghks.lNodeAddress ;
+        cnc_ack.mc = now() ;
         LoRaLastRssi = LoRa.packetRssi();                             // Get RSSI etc     
         LoRaLastSnr = LoRa.packetSnr();
         LoRaLastFrequencyError = LoRa.packetFrequencyError();
@@ -141,11 +160,13 @@ unsigned long timediff ;
         while (LoRa.available()){                                                                // clean out the rest of the packet and dump overboard
           LoRa.readBytes(packetBuffer, sizeof(packetBuffer));  
         }       
+        cnc_ack.cmd = cnc.cmd ;    
         switch(cnc.cmd ){ // command byte
           case 42:
             j = MAX_VALVE ;
             if ( j > cnc.valves ) 
               j = cnc.valves ;
+            cnc_ack.total = j ;
             Serial.println("Command 42...");      
             timediff = abs(cnc.mc - now());
             if ((( timediff > 30 ) && ( timediff < SECS_PER_DAY )) || ( year() < 2020 )){   // the 2020 exception is for startup
@@ -171,7 +192,8 @@ unsigned long timediff ;
               }
             }
             break;
-        }      
+        }   
+        bSendLoRaCNCACK = true ; 
       }
     }
   }
@@ -181,11 +203,40 @@ unsigned long timediff ;
 bool  ClearRemoteNodeList(void){
   for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {   // setup the defaults in the remote nodes list
     remlist[i].node = -1 ;
-    remlist[i].Rssi = 0  ;
-    remlist[i].Snr = 0 ;
+    remlist[i].RxRssi = 0  ;
+    remlist[i].RxSnr = 0 ;
+    remlist[i].TxRssi = 0  ;
+    remlist[i].TxSnr = 0 ;
     remlist[i].rxt = 0 ;
+    remlist[i].txt = 0 ;
     remlist[i].total = 0 ;
     remlist[i].uplinked = 0 ; 
+    remlist[i].TotalPackets = 0 ;
   }
   return (true);
 }
+
+int LoRaCheck(void){
+  long timediff1 ;
+  long timediff2 ;
+  int errcnt = 0 ; 
+  strLoRaResults = "" ;  // clear them
+
+  for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {   // setup the defaults in the remote nodes list
+    if (remlist[i].node > -1 ){
+      if ((year(remlist[i].txt) > 2020 ) && (year(remlist[i].rxt)>2020)){
+        timediff1 = abs(remlist[i].txt - now());
+        timediff2 = abs(remlist[i].rxt - now());
+        if (( timediff1 > SMTP.iLoRaTimeOut ) || ( timediff2 > SMTP.iLoRaTimeOut )) {
+          strLoRaResults += "Node " + String(remlist[i].node) + " not responeding \r\n" ;
+          errcnt++ ; 
+        }
+      }
+    }
+  }  
+  if ( errcnt == 0 ){
+    bLoRaGood = true ; 
+  }  
+  return(errcnt);
+}
+
