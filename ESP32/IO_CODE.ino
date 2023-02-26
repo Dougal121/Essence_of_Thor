@@ -11,6 +11,34 @@ int k ;
   return(bRet);  
 }
 
+int SolPulseWidth(int PulseIndex){
+  switch (PulseIndex){
+    case 1:
+      return(20);
+    break;
+    case 2:
+      return(40);
+    break;
+    case 3:
+      return(80);
+    break;
+    case 4:
+      return(160);
+    break;
+    case 5:
+      return(320);
+    break;
+    case 6:
+      return(640);
+    break;
+    case 7:
+      return(1280);
+    break;
+    default:
+      return(10);
+    break;
+  }
+}
 
 void ActivateOutput(int Board, int Bit, bool State, int PulseTime){
 int ii , k = -1 ;  
@@ -57,13 +85,14 @@ int j ;
       }
     break;
     case 2:  // LOCAL I/O
+      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
       if (( Bit < MAX_LOCAL_IO ) && ( LocalPINOK(elocal.IOPin[Bit]))){
         if ((( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MaxPinPort)) && ( elocal.IOPin[Bit] != 255 ))   {
-          if ( PulseTime < 0 ){
-            digitalWrite(elocal.IOPin[Bit],State) ;          
-          }else{
+          if ( PulseTime > 0 ){
             digitalWrite(elocal.IOPin[Bit],!State) ;
             delay(PulseTime);          
+            digitalWrite(elocal.IOPin[Bit],State) ;          
+          }else{
             digitalWrite(elocal.IOPin[Bit],State) ;          
           }
         }

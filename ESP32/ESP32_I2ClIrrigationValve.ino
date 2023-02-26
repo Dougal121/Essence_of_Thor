@@ -876,8 +876,8 @@ int x , y ;
 int board ;
 uint8_t OnPol ;
 uint8_t OffPol ;
-uint8_t OnPulse ;
-uint8_t OffPulse ;
+int OnPulse ;
+int OffPulse ;
 bool bSendCtrlPacket = false ;
 bool bDirty = false ;
 bool bDirty2 = false ;
@@ -1110,9 +1110,9 @@ int iLoRaReturn = 0 ;
     display.display();
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( bDirty ) {
-        vvalve[i].lTTC = evalve[i].lTTC ;   // if dirty then start all the timers again
+        vvalve[i].lTTC = evalve[i].lTTC ;                                          // if dirty then start all the timers again
       }
-      if (( evalve[i].TypeMaster & 0x40 ) == 0 ){  // do feeback first
+      if (( evalve[i].TypeMaster & 0x40 ) == 0 ){                                 // do feeback first
         if ( vvalve[i].bOnOff ){
           vvalve[i].iFB  = 0xff ; 
         }else{
@@ -1124,12 +1124,12 @@ int iLoRaReturn = 0 ;
       }
       OnPol = ((evalve[i].OnOffPolPulse & 0x80  ) >> 7  ) ;
       OffPol = ((evalve[i].OnOffPolPulse & 0x08  ) >> 3  ) ;
-      OnPulse = ((evalve[i].OnOffPolPulse & 0x70  ) >> 4  ) ;
-      OffPulse = ((evalve[i].OnOffPolPulse & 0x07  )  ) ;
+      OnPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x70  ) >> 4  )) ;
+      OffPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x07  )  )) ;
 //      OnPol = LOW ;
-//      OffPol = LOW ;
-      OnPulse =  ghks.lPulseTime % 128 ;
-      OffPulse =  ghks.lPulseTime % 128 ;
+//      OffPol = HIGH ;
+//      OnPulse =  ghks.lPulseTime % 128 ;
+//      OffPulse =  ghks.lPulseTime % 128 ;
       if (((vvalve[i].lTTG > 0 )|| (vvalve[i].lATTG > 0))&&(!vvalve[i].bOnOff)){
         vvalve[i].bOnOff = true ;
         board = ( evalve[i].OnCoilBoardBit & 0xf0 ) >> 4 ; 
@@ -1140,8 +1140,8 @@ int iLoRaReturn = 0 ;
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OnCoilBoardBit , OnPulse , OnPol );           // Pulse On          
 //          Serial.println("On Pulse " + String(OnPulse));
-          OnPol = LOW ;
-          OffPol = HIGH ;
+//          OnPol = LOW ;
+//          OffPol = HIGH ;
           ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }        
@@ -1151,13 +1151,14 @@ int iLoRaReturn = 0 ;
         board = ( evalve[i].OffCoilBoardBit & 0xf0 ) >> 4 ; 
         board = 0 ;
         if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {
-//          IOEXP[board].write( evalve[i].OffCoilBoardBit , !OnPol );   // hold off
-          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , 0 ) ;
+//          IOEXP[board].write( evalve[i].OffCoilBoardBit , !OnPol );                      // hold off
+          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usfull
         }else{
-          OnPol = LOW ;
-          OffPol = HIGH ;          
-//          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );   // Pulse Off 
-          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OffPol , OffPulse ) ;
+//          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
+//          Serial.println("Off Pulse " + String(OffPulse));
+//          OnPol = LOW ;
+//          OffPol = HIGH ;
+          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , OffPulse ) ;
           delay(ghks.lPulseTime % 128 ); 
         }
       }

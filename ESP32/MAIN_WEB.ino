@@ -286,9 +286,14 @@ void handleRoot() {
       }        
       i = String(server.argName(j)).indexOf("vpon" + MyNum);
       if (i != -1){  // on valve polatity and pulse time
-        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x0F ) | ( 0xF0 & (( String(server.arg(j)).toInt()) << 4 ))  ;
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x8f ) | ( 0x70 & (( String(server.arg(j)).toInt()) << 4 ))  ;
 //        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
       }        
+      i = String(server.argName(j)).indexOf("vppon" + MyNum);
+      if (i != -1){  // on valve polatity and pulse time
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0x7f ) | ( 0x80 & (( String(server.arg(j)).toInt()) << 7 ))  ;
+//        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
+      }       
       i = String(server.argName(j)).indexOf("vaon" + MyNum);
       if (i != -1){  // on valve address
         evalve[ii].OnCoilBoardBit = ( evalve[ii].OnCoilBoardBit & 0x0f ) | (( 0x0F & String(server.arg(j)).toInt())<<4)  ;
@@ -302,9 +307,14 @@ void handleRoot() {
       }        
       i = String(server.argName(j)).indexOf("vpof" + MyNum);
       if (i != -1){  // off valve polatity and pulse time
-        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF0 ) | ( 0x0f &  String(server.arg(j)).toInt())  ;
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF8 ) | ( 0x07 &  String(server.arg(j)).toInt())  ;
 //        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
       }        
+      i = String(server.argName(j)).indexOf("vppof" + MyNum);
+      if (i != -1){  // off valve polatity and pulse time
+        evalve[ii].OnOffPolPulse = ( evalve[ii].OnOffPolPulse & 0xF7 ) | ( 0x08 &  (String(server.arg(j)).toInt()<<3))  ;
+//        Serial.println("OnOffPolPulse" + String(evalve[ii].OnOffPolPulse) );  
+      }       
       i = String(server.argName(j)).indexOf("vaof" + MyNum);
       if (i != -1){  // off valve address
         evalve[ii].OffCoilBoardBit = ( evalve[ii].OffCoilBoardBit & 0x0f ) | (( 0x0F & String(server.arg(j)).toInt())<<4)  ;
