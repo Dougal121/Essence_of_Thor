@@ -14,23 +14,23 @@
     Compile for TTGO LaRA board Version 1.0 
 */
 #include <WiFi.h>              // All creature great and small as long as they are WiFi based 
-#include <WiFiClient.h>        //
+#include <WiFiClient.h>        // from the "standard book of spells" (Arduino lib manager)
 #include <WebServer.h>         // what it says on the box
 //#include <ESPmDNS.h>
 #include <WiFiUDP.h>           // UDP protocal driver
-#include <Update.h>
-#include <TimeLib.h>           //
-#include <Wire.h>              // I2C bus driver
+#include <Update.h>            // this is the OTA update code ?
+#include <TimeLib.h>           // All the handy time functions in UNIX based time
+#include <Wire.h>              // I2C bus driver and SPI driver
 #include <EEPROM.h>            // Internal chip eeprom
 #include <stdio.h>             // The odd angree shot in pure C
-#include "PCF8574DJP.h"        // 
-#include "Adafruit_MCP23017.h" // Port expansion driver 
+#include "PCF8574DJP.h"        // Bastardised version of an orginal lib 
+#include "Adafruit_MCP23017.h" // Port expansion lib ... modified ?
 #include "SSD1306.h"           // OLED Display
 //#include "SH1106.h"          // OLED Display
 #include "SH1106Wire.h"        // Another breed of OLED
-#include "ds3231.h"            // RTC
+#include "ds3231.h"            // RTC   --- this one is in my solar tracker projects libs (in GIT )
 #include <ESP_Mail_Client.h>   // Include ESP Mail Client library (this library)
-#include <LoRa.h>
+#include <LoRa.h>              // From the TTGO sites Git Repositry (loaded via arduino IDE lib manager)
 
 //define the pins used by the LoRa transceiver module
 #define SCK 5
@@ -49,7 +49,7 @@
 //915E6 for North America
 #define BAND 915E6
 
-#include "uEEPROMLib.h"    //   SD card lib for the RTC memory logging
+#include "uEEPROMLib.h"                       //   SD card lib for the RTC memory logging
 //#include <ESP8266Ping.h>
 uEEPROMLib rtceeprom(0x57);
 
