@@ -30,4 +30,5 @@ LocalCPU I/O<br>
 <b>2022-2023 Irrigation season</b><br>
 <br>
 26/02/2023 ESP332 version going on 915MHz TTGO LoRa Board.<br>
+04/03/2023        Put CRC 16 on control packets and sort of upto range testing the LoRa under real world conditions.<br>
 
