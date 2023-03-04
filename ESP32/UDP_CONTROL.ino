@@ -26,6 +26,7 @@ cnc_t  cnc ;
       }
     }
     cnc.valves = ii ;
+    cnc.crc = calculateCRC16(&cnc,sizeof(cnc)-2);
     if ( ii > 0 ){                                                                         // there are valves to be uplinked
 //      WiFi.hostByName(address, ghks.RCIP );
       if (WiFi.isConnected())  {
@@ -74,36 +75,40 @@ int i , j ;
 int ii ;
 byte packetBuffer[16];
 cnc_t  cnc ;  
+uint16_t     crc ;
 
 //  Serial.println("Process Uplinked data...");      
   memset(&cnc, 0, sizeof(cnc));
   ctrludp.read((byte *)&cnc, sizeof(cnc)); // read the packet into the buffer
-
-  switch(cnc.cmd ){ // command byte
-    case 42:
-      j = MAX_VALVE ;
-      if ( j > cnc.valves ) 
-        j = cnc.valves ;
-//      Serial.println("Command 42...");      
-      for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
-        ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
-        Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
-        if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
-          if ( ghks.lNodeAddress == cnc.cv[i].Node ){
-            if ( evalve[ii].bEnable ){
-              vvalve[ii].lATTG = cnc.cv[i].lATTG ;
-            } 
-            vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
-            vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
-            evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
-            evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
-            Serial.println("Uplinked data accepted Valve No " + String(ii));      
+  crc = calculateCRC16(&cnc,sizeof(cnc)-2);
+  if ( crc == cnc.crc ){
+    switch(cnc.cmd ){ // command byte
+      case 42:
+        j = MAX_VALVE ;
+        if ( j > cnc.valves ) 
+          j = cnc.valves ;
+  //      Serial.println("Command 42...");      
+        for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
+          ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
+          Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
+          if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
+            if ( ghks.lNodeAddress == cnc.cv[i].Node ){
+              if ( evalve[ii].bEnable ){
+                vvalve[ii].lATTG = cnc.cv[i].lATTG ;
+              } 
+              vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
+              vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
+              evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
+              evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
+              Serial.println("Uplinked data accepted Valve No " + String(ii));      
+            }
           }
         }
-      }
-      break;
+        break;
+    }
+  }else{
+    Serial.println("CRC Failed on UDP CNC Packet");
   }
-
   while (ctrludp.available()){  // clean out the rest of the packet and dump overboard
     ctrludp.read(packetBuffer, sizeof(packetBuffer));  
   } 
@@ -116,6 +121,7 @@ int ii ;
 byte packetBuffer[16];
 int packetSize = 0 ;
 unsigned long timediff ;
+uint16_t     crc ;
 
   if (bLoRa) {                                                      // check we LoRa working 
     packetSize = LoRa.parsePacket();
@@ -124,26 +130,33 @@ unsigned long timediff ;
       if ( packetSize ==  sizeof(cnc_ack) ){
         Serial.println("LoRa CNC ACK packet recieved RSSI: " + String(LoRa.packetRssi())+ " SNR "+String(LoRa.packetSnr()) + " FE " + String(LoRa.packetFrequencyError()));
         LoRa.readBytes((byte *)&cnc_ack, sizeof(cnc_ack));                                       // read the packet into the structure
+        crc = calculateCRC16(&cnc_ack,sizeof(cnc_ack)-2);
         while (LoRa.available()){                                                                // clean out the rest of the packet and dump overboard
           LoRa.readBytes(packetBuffer, sizeof(packetBuffer));  
         }       
-        if ( cnc_ack.cmd == 42 ){
-          for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                 // setup the defaults in the remote nodes list
-            if (( remlist[i].node = cnc_ack.snode ) || ( remlist[i].node = -1 )){
-              remlist[i].node = cnc_ack.snode ;
-              remlist[i].TxRssi =  cnc_ack.Rssi  ;
-              remlist[i].TxSnr = cnc_ack.Snr ;
-              remlist[i].txt =  cnc_ack.mc ;     
-              remlist[i].RxRssi =   LoRa.packetRssi()  ;
-              remlist[i].RxSnr =  LoRa.packetSnr() ;
-              remlist[i].rxt =  now() ;     
-              remlist[i].total = cnc_ack.total ;
-              remlist[i].uplinked = cnc_ack.uplinked ;   
-              remlist[i].TotalPackets++ ;
-              i = MAX_REM_LIST ;                                  // exit as we have found the target  
+        if (crc == cnc_ack.crc){           // ensure valid command and packet crc
+          if ( cnc_ack.cmd == 42 ){
+            for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                 // setup the defaults in the remote nodes list
+              if (( remlist[i].node = cnc_ack.snode ) || ( remlist[i].node = -1 )){
+                remlist[i].node = cnc_ack.snode ;
+                remlist[i].TxRssi =  cnc_ack.Rssi  ;
+                remlist[i].TxSnr = cnc_ack.Snr ;
+                remlist[i].txt =  cnc_ack.mc ;     
+                remlist[i].RxRssi =   LoRa.packetRssi()  ;
+                remlist[i].RxSnr =  LoRa.packetSnr() ;
+                remlist[i].rxt =  now() ;     
+                remlist[i].total = cnc_ack.total ;
+                remlist[i].uplinked = cnc_ack.uplinked ;   
+                remlist[i].TotalPackets++ ;
+                i = MAX_REM_LIST ;                                  // exit as we have found the target  
+              }
             }
           }
         }
+        else{
+          Serial.println("CRC Failed on LoRa CNC_ACK Packet");          
+        }
+        
       }else{
         memset(&cnc, 0, sizeof(cnc));
         memset(&cnc_ack, 0, sizeof(cnc));
@@ -157,43 +170,49 @@ unsigned long timediff ;
         LoRaLastFrequencyError = LoRa.packetFrequencyError();
         Serial.println("LoRa CNC packet recieved RSSI: " + String(LoRaLastRssi)+ " SNR "+String(LoRaLastSnr) + " FE " + String(LoRaLastFrequencyError));
         LoRa.readBytes((byte *)&cnc, sizeof(cnc));                                               // read the packet into the structure
+        crc = calculateCRC16(&cnc,sizeof(cnc)-2);
         while (LoRa.available()){                                                                // clean out the rest of the packet and dump overboard
           LoRa.readBytes(packetBuffer, sizeof(packetBuffer));  
         }       
         cnc_ack.cmd = cnc.cmd ;    
-        switch(cnc.cmd ){ // command byte
-          case 42:
-            j = MAX_VALVE ;
-            if ( j > cnc.valves ) 
-              j = cnc.valves ;
-            cnc_ack.total = j ;
-            Serial.println("Command 42...");      
-            timediff = abs(cnc.mc - now());
-            if ((( timediff > 30 ) && ( timediff < SECS_PER_DAY )) || ( year() < 2020 )){   // the 2020 exception is for startup
-              setTime((time_t)cnc.mc);   // set node to the master clock
-              snprintf(buff, BUFF_MAX, "Time set from master clock %d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());          
-              Serial.println( String(buff)) ;                   
-            }
-            for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
-              ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
-              Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
-              if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
-                if ( ghks.lNodeAddress == cnc.cv[i].Node ){
-                  if ( evalve[ii].bEnable ){
-                    vvalve[ii].lATTG = cnc.cv[i].lATTG ;
-                  } 
-                  vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
-                  vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
-                  evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
-                  evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
-                  Serial.println("Uplinked data accepted Valve No " + String(ii));      
-                  cnc_ack.uplinked++ ;
+        if ( crc == cnc.crc ){
+          switch(cnc.cmd ){ // command byte
+            case 42:
+              j = MAX_VALVE ;
+              if ( j > cnc.valves ) 
+                j = cnc.valves ;
+              cnc_ack.total = j ;
+              Serial.println("Command 42...");      
+              timediff = abs(cnc.mc - now());
+              if ((( timediff > 30 ) && ( timediff < SECS_PER_DAY )) || ( year() < 2020 )){   // the 2020 exception is for startup
+                setTime((time_t)cnc.mc);   // set node to the master clock
+                snprintf(buff, BUFF_MAX, "Time set from master clock %d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());          
+                Serial.println( String(buff)) ;                   
+              }
+              for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
+                ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
+                Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
+                if (( ii >= 0 ) && (ii < MAX_VALVE ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
+                  if ( ghks.lNodeAddress == cnc.cv[i].Node ){
+                    if ( evalve[ii].bEnable ){
+                      vvalve[ii].lATTG = cnc.cv[i].lATTG ;
+                    } 
+                    vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
+                    vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
+                    evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
+                    evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
+                    Serial.println("Uplinked data accepted Valve No " + String(ii));      
+                    cnc_ack.uplinked++ ;
+                  }
                 }
               }
-            }
-            break;
-        }   
-        bSendLoRaCNCACK = true ; 
+              break;
+          }   
+          cnc_ack.crc = calculateCRC16(&cnc_ack,sizeof(cnc_ack)-2);
+          bSendLoRaCNCACK = true ;
+        } else{
+          Serial.println("CRC Failed on LoRa CNC Packet");          
+        }
       }
     }
   }
@@ -239,4 +258,24 @@ int LoRaCheck(void){
   }  
   return(errcnt);
 }
+
+
+uint16_t calculateCRC16(const void* data, size_t size)
+{
+    const uint16_t polynomial = 0x1021;
+    uint16_t crc = 0xFFFF;
+
+    const byte* byteData = static_cast<const byte*>(data);
+    for (size_t i = 0; i < size; ++i)
+    {
+        crc ^= (static_cast<unsigned short>(byteData[i]) << 8);
+        for (int j = 0; j < 8; ++j)
+        {
+            crc = ((crc & 0x8000) ? ((crc << 1) ^ polynomial) : (crc << 1));
+        }
+    }
+    return crc;
+}
+
+
 

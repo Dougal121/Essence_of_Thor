@@ -284,7 +284,11 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char nssid[16] ;                        // 62  
   char npassword[16] ;                    // 78
   time_t AutoOff_t ;                      // 82     auto off until time > this date   
-  long lDisplayOptions  ;                 // 86 
+//  long lDisplayOptions  ;               // 86 
+  uint8_t lDisplayOptions ;
+  uint8_t cpufreq ;                       //    240 160 80   not flash at 26
+  uint8_t displaytimer ;                  //     how log does the display stay on for (minutes) ?  0 fo display on always
+  uint8_t magsens ;                       //     magnet sensor sesitivity use instead of the button
   uint8_t lNetworkOptions  ;              // 84 
   uint8_t ValveLogOptions  ;              // 85 
   uint8_t lFertActiveOptions  ;           // 86   was lSpare2
@@ -352,7 +356,7 @@ typedef struct __attribute__((__packed__)) {
   uint8_t      snode ;           // source node
   uint8_t      valves ;          // number to follow
   cnc_v_t      cv[16] ;          // the most that we can have   16 x 14 = 224
-  int16_t      crc ;
+  uint16_t     crc ;
 } cnc_t ;                        // 234 bytes
 
 typedef struct __attribute__((__packed__)) {
@@ -366,7 +370,7 @@ typedef struct __attribute__((__packed__)) {
   float        Snr ;
   long         spare1 ;
   long         spare2 ; 
-  int16_t      crc ;
+  uint16_t     crc ;
 } cnc_ack_t ;                        // 28 bytes
 
 cnc_ack_t cnc_ack;
@@ -484,6 +488,7 @@ bool bFertDisable = false ;
 bool bLoRa = false ; 
 bool bButton = false ;
 int  iDisplayCountDown = 0 ;
+int magval = 0 ;
 String strBusResults ;
 String strLoRaResults ;
 WiFiUDP ntpudp;
@@ -659,89 +664,8 @@ int i , k , j = 0;
     delay(200);
   }
 
-  WiFi.disconnect();
-  Serial.println("Configuring soft access point...");
-  WiFi.mode(WIFI_AP_STA);  // we are having our cake and eating it eee har
-  sprintf(cssid,"Configure_%08X\0",chipid);
-  if ( cssid[0] == 0 || cssid[1] == 0 ){   // pick a default setup ssid if none
-    sprintf(ghks.cpassword,"\0");
-  }
-  MyIPC = IPAddress (192, 168, 5 +(chipid & 0x7f ) , 1);
-  Serial.print("Asking for Soft AP on address: ");
-  snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
-  Serial.println(buff);
-  WiFi.softAPConfig(MyIPC,MyIPC,IPAddress (255, 255, 255 , 0));  
-  Serial.println("Starting access point...");
-  Serial.print("SSID: ");
-  Serial.println(cssid);
-  Serial.print("Password: >");
-  Serial.print(ghks.cpassword);
-  Serial.println("< " + String(ghks.cpassword[0]));
-  if (( ghks.cpassword[0] == 0 ) || ( ghks.cpassword[0] == 0xff)){
-    WiFi.softAP((char*)cssid);                   // no passowrd
-  }else{
-    WiFi.softAP((char*)cssid,(char*) ghks.cpassword);
-  }
-  MyIPC = WiFi.softAPIP();  // get back the address to verify what happened
-  Serial.print("Soft AP IP Started on address: ");
-  snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
-  Serial.println(buff);
+  StartWiFi();
   
-  bConfig = false ;   // are we in factory configuratin mode
-  display.display();
-  if ( ghks.lNetworkOptions != 0 ) {
-    WiFi.config(ghks.IPStatic,ghks.IPGateway,ghks.IPMask,ghks.IPDNS ); 
-  }  
-  if ( ghks.npassword[0] == 0 ){
-    WiFi.begin((char*)ghks.nssid);                            // connect to unencrypted access point      
-  }else{
-    WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);     // connect to access point with encryption
-  }
-  while (( WiFi.status() != WL_CONNECTED ) && ( j < MAX_WIFI_TRIES )) {
-    j = j + 1 ;
-    delay(500);
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.drawString(0, 0, "Chip ID " + String((uint32_t)chipid, HEX) );
-    display.drawString(0, 9, String("SSID:") );
-    display.drawString(0, 18, String("Password:") );
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.drawString(128 , 0, String(WiFi.RSSI()));
-    display.drawString(128, 9, String(ghks.nssid) );
-    display.drawString(128, 18, String(ghks.npassword) );
-    display.drawString(j*4, 27 , String(">") );
-    display.drawString(0, 36 , String(1.0*j/2) + String(" (s)" ));   
-    snprintf(buff, BUFF_MAX, ">>  IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);            
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.drawString(63 , 54 ,  String(buff) );
-    display.display();     
-    digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
-  } 
-  if ( j >= MAX_WIFI_TRIES ) {
-     bConfig = true ;
-     WiFi.disconnect();
-/*     IPAddress localIp(192, 168, 5 +(ESP.getChipId() & 0x7f ) , 1);
-     IPAddress MaskIp(255, 255, 255 , 0);
-     WiFi.softAPConfig(localIp,localIp,MaskIp);
-     sprintf(ssid,"Configure_%08X\0",ESP.getChipId());
-     WiFi.softAP(ssid); // configure mode no password
-     MyIP = WiFi.softAPIP();
-     Serial.print("Soft AP IP address: ");
-     Serial.println(MyIP);
-     display.drawString(0, 22, "Soft AP IP address: "+String(MyIP) );
-     display.display();*/
-  }else{
-     Serial.println("");
-     Serial.println("WiFi connected");  
-     Serial.print("IP address: ");
-     MyIP =  WiFi.localIP() ;
-//     Serial.println(MyIP) ;
-     snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);            
-     Serial.println(buff);
-     display.drawString(0 , 53 ,  String(buff) );
-//     display.drawString(0, 53, "IP "+String(MyIP) );
-     display.display();
-  }
   if (ghks.localPortCtrl == ghks.localPort ){             // bump the NTP port up if they ar the same
     ghks.localPort++ ;
   }
@@ -783,7 +707,7 @@ int i , k , j = 0;
   server.on("/fertque", DisplayShowFertQue);  
   server.on("/iolocal", ioLocalMap);
   server.on("/adc", adcLocalMap);
-//  server.on("/eeprom", DisplayEEPROM);
+  server.on("/eeprom", DisplayEEPROM);
   server.on("/valvelog",DisplayValveLog);
   server.on("/valvelog.csv", HTTP_GET , DisplayValveLog);  
   server.on("/backup", HTTP_GET , handleBackup);
@@ -864,7 +788,7 @@ int i , k , j = 0;
     Serial.println("LoRa Initialization OK");  
     bLoRa = true ;
   }
-  
+//  SetSelectedSpeed();
 }
 
 //  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
@@ -890,14 +814,20 @@ int iHM = 0 ;
 int iDOW = 0 ;
 int iRebootTime = 0 ;
 time_t NowTime ;
-
 int iBusReturn = 0 ;
 int iLoRaReturn = 0 ;
 
-
+/*
+  if ( iDisplayCountDown != 0 ){
+    if ( ghks.cpufreq < 240 ){     // use    ghks.cpufreq   ???? faster 
+      setCpuFrequencyMhz(240);
+    }
+  }*/
   server.handleClient();
   DoLaRaStuff();
+//  SetSelectedSpeed();
   
+  magval = hallRead();  // check for magnets near by ( wake up signal but the bare chip doesnt have one ONLY the silver modules )
   lTime = millis() ;
   iTestTime = constrain(iTestTime,2,50);
   iTestMode = constrain(iTestMode,-1,16);
@@ -938,8 +868,12 @@ int iLoRaReturn = 0 ;
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
     display.drawString(0 , LineText, String(buff) );
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.drawString(127 , LineText, String(WiFi.RSSI()));
-
+    if (!WiFi.isConnected())  {
+      display.drawString(127 , LineText, String(WiFi.RSSI()));
+    }else{
+      display.drawString(127 , LineText, "-X-");
+    }
+    
     if ( bBusGood ){
       if ( bLoRaGood ){
       }else{
@@ -1105,7 +1039,7 @@ int iLoRaReturn = 0 ;
         display.drawCircle(i*8+3, 41, 1);
       }       
     }
-    if ( iDisplayCountDown == 0 )
+    if (( iDisplayCountDown == 0 ) && ( ghks.displaytimer > 0 ))
       display.clear();  // turn off all the pixels
     display.display();
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
@@ -1172,8 +1106,10 @@ int iLoRaReturn = 0 ;
     if (WiFi.isConnected())  {
       digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
     }else{
-      if (( rtc_sec % 2 ) == 0 )    {
-        digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));        
+      if (( rtc_sec % 4 ) == 0 )    {
+        digitalWrite(ESP32_BUILTIN_LED,true);        
+      }else{
+        digitalWrite(ESP32_BUILTIN_LED,false);                
       }
     }
     rtc_sec = second() ;
@@ -1339,8 +1275,12 @@ int iLoRaReturn = 0 ;
   if ( rtc_min != minute()){
     bSendCtrlPacket = true ;    
     lMinUpTime++ ;
-    if (  iDisplayCountDown > 1  )  //  decrement display saver
+    if ((  iDisplayCountDown > 0  )&& ( ghks.displaytimer>0)){  //  decrement display saver
        iDisplayCountDown-- ;
+       if ((iDisplayCountDown == 0) ) {  //&& ( lMinUpTime > 5 )
+         StopWiFi();
+       }
+    }
        
     if (( lMinUpTime == 15 ) && SMTP.bUseEmail ) {
       SendEmailToClient(-2);                         // email that reboot just occureed  
@@ -1491,51 +1431,60 @@ int iLoRaReturn = 0 ;
   filter_scan();
   filter_sec();
 //  dnsServer.processNextRequest();
-  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
-  if ( !bPrevConnectionStatus && WiFi.isConnected() ){
-     Serial.println(String(buff )+ " WiFi Reconnected OK...");  
-     MyIP =  WiFi.localIP() ;
-     snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);            
-     Serial.println(buff);      
+
+  if ( iDisplayCountDown != 0 ){
+    snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
+    if ( !bPrevConnectionStatus && WiFi.isConnected() ){
+       Serial.println(String(buff )+ " WiFi Reconnected OK...");  
+       MyIP =  WiFi.localIP() ;
+       snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);            
+       Serial.println(buff);      
+    }
+    if (!WiFi.isConnected())  {
+      lTD = (long)lTimeNext-(long) millis() ;
+      if (( abs(lTD)>40000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
+        lTimeNext = millis() - 1 ;
+  /*      Serial.print(millis());
+        Serial.print(" ");
+        Serial.print(lTimeNext);
+        Serial.print(" ");
+        Serial.println(abs(lTD));*/
+      }
+      bPrevConnectionStatus = false;
+      if ( lTimeNext < millis() ){
+        Serial.println(String(buff )+ " Trying to reconnect WiFi ");
+        WiFi.disconnect(false);
+  //      Serial.println("Connecting to WiFi...");
+        WiFi.mode(WIFI_AP_STA);
+        if ( ghks.lNetworkOptions != 0 ) {            // use ixed IP
+          WiFi.config(ghks.IPStatic, ghks.IPGateway, ghks.IPMask, ghks.IPDNS );
+        }
+        if ( ghks.npassword[0] == 0 ) {
+          WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point
+        } else {
+          WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
+        }
+        lTimeNext = millis() + 30000 ;
+      }
+    }else{
+      bPrevConnectionStatus = true ;
+    }  
   }
-  if (!WiFi.isConnected())  {
-    lTD = (long)lTimeNext-(long) millis() ;
-    if (( abs(lTD)>40000)||(bPrevConnectionStatus)){ // trying to get roll over protection and a 30 second retry
-      lTimeNext = millis() - 1 ;
-/*      Serial.print(millis());
-      Serial.print(" ");
-      Serial.print(lTimeNext);
-      Serial.print(" ");
-      Serial.println(abs(lTD));*/
-    }
-    bPrevConnectionStatus = false;
-    if ( lTimeNext < millis() ){
-      Serial.println(String(buff )+ " Trying to reconnect WiFi ");
-      WiFi.disconnect(false);
-//      Serial.println("Connecting to WiFi...");
-      WiFi.mode(WIFI_AP_STA);
-      if ( ghks.lNetworkOptions != 0 ) {            // use ixed IP
-        WiFi.config(ghks.IPStatic, ghks.IPGateway, ghks.IPMask, ghks.IPDNS );
-      }
-      if ( ghks.npassword[0] == 0 ) {
-        WiFi.begin((char*)ghks.nssid);                    // connect to unencrypted access point
-      } else {
-        WiFi.begin((char*)ghks.nssid, (char*)ghks.npassword);  // connect to access point with encryption
-      }
-      lTimeNext = millis() + 30000 ;
-    }
-  }else{
-    bPrevConnectionStatus = true ;
-  }  
   
   if( !bButton ){
     if ( digitalRead(0) == true ){
       if ( iDisplayCountDown == 0 ){
-        iDisplayCountDown = 60 ;   // turn on display
+        iDisplayCountDown = ghks.displaytimer ;   // turn on display
+        if (lMinUpTime > 1) {
+          setCpuFrequencyMhz(240);   
+          StartWiFi();
+        }
       }else{
         iDisplayCountDown = 0 ;   // turn off display
+        StopWiFi();
+        SetSelectedSpeed();
       }
-      bButton = true ;
+      bButton = true ;  
     }
   }else{
     if ( digitalRead(0) == false ){
@@ -1552,5 +1501,26 @@ int iLoRaReturn = 0 ;
 }   //  ################### BOTTOM OF LOOP ########################
 
 
+void SetSelectedSpeed(void){
+  switch(ghks.cpufreq){
+    case 13:
+      setCpuFrequencyMhz(13);
+    break;
+    case 26:
+      setCpuFrequencyMhz(26);
+    break;
+    case 80:
+      setCpuFrequencyMhz(80);
+    break;
+    case 160:
+      setCpuFrequencyMhz(160);
+    break;
+    default:
+      setCpuFrequencyMhz(240);
+    break;    
+  }
+//  Serial.println("CPU commanded " +String(ghks.cpufreq) + " actual " + String(getCpuFrequencyMhz())+ " MHz");
+//  Serial.println("CPU commanded " +String(ghks.cpufreq)+ " MHz");
+}
 
 

@@ -8,7 +8,7 @@ void handleBTest(){
   byte mac[6];
  
 
-  SerialOutParams();
+//  SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
     i = String(server.argName(j)).indexOf("testb");
@@ -87,78 +87,14 @@ void handleVSSS(){
 
   }
   
-  SendHTTPHeader();
-
-  server.sendContent(F("<br><b>Fertigation Status</b>"));
-  message = F("<table border=1 title='Fertigation Status'>") ;
-  message += F("<tr><th>Tank</th><th>Run</th><th>Enable</th><th>On/Off</th><th>lTTG</th><th>Flowrate</th></tr>") ; 
-  server.sendContent(message) ;
-  message = "" ;
-  
-  for ( i = 0 ; i < MAX_FERT ; i++){
-    if ((vfert[i].bRun ) == 0  ) {
-      MyColor = F("bgcolor=red") ;
-    }else{
-      MyColor = F("bgcolor=green") ;
-    }
-    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
-    message += "<td>" + String(vfert[i].bRun) + "</td>";
-    message += "<td>" + String(vfert[i].bEnable) + "</td>";
-    message += "<td>" + String(vfert[i].bOnOff) + "</td>";
-    message += "<td>" + String(vfert[i].lTTG) + "</td>";
-    message += "<td>" + String(vfert[i].Flowrate) + "</td><tr>";
-    server.sendContent(message) ;
-    message = "" ;
-  }
-  message = F("</table>") ;
-  server.sendContent(message) ;
-
-  message = F("<br><b>Filter Status</b><br><table border=1 title='Filter Status'>") ;
-  message += F("<tr><th>Filter</th><th>Next Can</th><th>bOnOff</th><th>bFlush</th><th>lTTG</th></tr>") ; 
-  server.sendContent(message) ;
-  message = "" ;
-  for ( i = 0 ; i < MAX_FILTER ; i++){
-    if ((vfilter[i].bOnOff ) == 0  ) {
-      MyColor = F("bgcolor=red") ;
-    }else{
-      MyColor = F("bgcolor=green") ;
-    }
-    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
-    message += "<td>" + String(vfilter[i].NextCan) + "</td>";
-    message += "<td>" + String(vfilter[i].bOnOff) + "</td>";
-    message += "<td>" + String(vfilter[i].bFlush) + "</td>";
-    message += "<td>" + String(vfilter[i].lTTG) + "</td><tr>";
-    server.sendContent(message) ;
-    message = "" ;
-  }
-  message = F("</table>") ;
-  server.sendContent(message) ;
-
-  message = F("<br><b>Valve Status</b><br><table border=1 title='Valve Status'>") ;
-  message += F("<tr><th>Valve</th><th>bOnOff</th><th>lATTG</th><th>lTTG</th><th>iFB</th></tr>") ; 
-  server.sendContent(message) ;
-  message = "" ;
-  for ( i = 0 ; i < MAX_VALVE ; i++){
-    if ((vvalve[i].bOnOff ) == 0  ) {
-      MyColor = F("bgcolor=red") ;
-    }else{
-      MyColor = F("bgcolor=green") ;
-    }
-    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
-    message += "<td>" + String(vvalve[i].bOnOff,BIN) + "</td>";
-    message += "<td>" + String(vvalve[i].lATTG) + "</td>";
-    message += "<td>" + String(vvalve[i].lTTG) + "</td>";
-    message += "<td>" + String(vvalve[i].iFB,HEX) + "</td><tr>";
-    server.sendContent(message) ;
-    message = "" ;
-  }
-  message = F("</table>") ;
-  server.sendContent(message) ;
-
+  SendHTTPHeader(60);  
   LoRaCheck();
-  message = F("<br><b>CNC Node Status</b><br><table border=1 title='CNC Node Status'>") ;
-  message += F("<tr><th colspan=2>Record</th><th colspan=3>RX</th><th colspan=3>TX</th><th colspan=3>Stats</th></tr>") ; 
-  message += F("<tr><th>Number</th><th>Node</th><th>RSSI</th><th>SNR</th><th>RX Time</th><th>RSSI</th><th>SNR</th><th>RX Time</th><th>Total</th><th>Uplinked</th><th>Packets</th></tr>") ; 
+
+  SendCurrentTime();
+  
+  message = F("<br><b>CNC Node Status</b><br><table border=1 title='CNC Node Status'>\r\n") ;
+  message += F("<tr><th colspan=2>Record</th><th colspan=3>RX</th><th colspan=3>TX</th><th colspan=3>Stats</th></tr>\r\n") ; 
+  message += F("<tr><th>Number</th><th>Node</th><th>RSSI</th><th>SNR</th><th>RX Time</th><th>RSSI</th><th>SNR</th><th>RX Time</th><th>Total</th><th>Uplinked</th><th>Packets</th></tr>\r\n") ; 
   server.sendContent(message) ;
   message = "" ;
   for (i = 0 ; i < MAX_REM_LIST ; i++ ) {   // enumerate the remote nodes list
@@ -192,13 +128,80 @@ void handleVSSS(){
 
       message += "<td>" + String(remlist[i].total) + "</td>";
       message += "<td>" + String(remlist[i].uplinked) + "</td>";
-      message += "<td>" + String(remlist[i].TotalPackets) + "</td><tr>";
+      message += "<td>" + String(remlist[i].TotalPackets) + "</td><tr>\r\n";
+      server.sendContent(message) ;
     }
+  }
+  message = F("</table>\r\n") ;
+  server.sendContent(message) ;
+
+  message = F("<br><b>Fertigation Status</b>\r\n");
+  message += F("<table border=1 title='Fertigation Status'>\r\n") ;
+  message += F("<tr><th>Tank</th><th>Run</th><th>Enable</th><th>On/Off</th><th>lTTG</th><th>Flowrate</th></tr>\r\n") ; 
+  server.sendContent(message) ;
+  message = "" ;
+  
+  for ( i = 0 ; i < MAX_FERT ; i++){
+    if ((vfert[i].bRun ) == 0  ) {
+      MyColor = F("bgcolor=red") ;
+    }else{
+      MyColor = F("bgcolor=green") ;
+    }
+    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
+    message += "<td>" + String(vfert[i].bRun) + "</td>";
+    message += "<td>" + String(vfert[i].bEnable) + "</td>";
+    message += "<td>" + String(vfert[i].bOnOff) + "</td>";
+    message += "<td>" + String(vfert[i].lTTG) + "</td>";
+    message += "<td>" + String(vfert[i].Flowrate) + "</td><tr>\r\n";
     server.sendContent(message) ;
     message = "" ;
   }
-  message = F("</table>") ;
+  message = F("</table>\r\n") ;
   server.sendContent(message) ;
+
+  message = F("<br><b>Filter Status</b><br><table border=1 title='Filter Status'>\r\n") ;
+  message += F("<tr><th>Filter</th><th>Next Can</th><th>bOnOff</th><th>bFlush</th><th>lTTG</th></tr>\r\n") ; 
+  server.sendContent(message) ;
+  message = "" ;
+  for ( i = 0 ; i < MAX_FILTER ; i++){
+    if ((vfilter[i].bOnOff ) == 0  ) {
+      MyColor = F("bgcolor=red") ;
+    }else{
+      MyColor = F("bgcolor=green") ;
+    }
+    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
+    message += "<td>" + String(vfilter[i].NextCan) + "</td>";
+    message += "<td>" + String(vfilter[i].bOnOff) + "</td>";
+    message += "<td>" + String(vfilter[i].bFlush) + "</td>";
+    message += "<td>" + String(vfilter[i].lTTG) + "</td><tr>\r\n";
+    server.sendContent(message) ;
+    message = "" ;
+  }
+  message = F("</table>\r\n") ;
+  server.sendContent(message) ;
+
+  message = F("<br><b>Valve Status</b><br><table border=1 title='Valve Status'>\r\n") ;
+  message += F("<tr><th>Valve</th><th>bOnOff</th><th>lATTG</th><th>lTTG</th><th>iFB</th></tr>\r\n") ; 
+  server.sendContent(message) ;
+  message = "" ;
+  for ( i = 0 ; i < MAX_VALVE ; i++){
+    if ((vvalve[i].bOnOff ) == 0  ) {
+      MyColor = F("bgcolor=red") ;
+    }else{
+      MyColor = F("bgcolor=green") ;
+    }
+    message += "<tr><td align=center "+String(MyColor)+">"+String(i)+"</td>";         
+    message += "<td>" + String(vvalve[i].bOnOff,BIN) + "</td>";
+    message += "<td>" + String(vvalve[i].lATTG) + "</td>";
+    message += "<td>" + String(vvalve[i].lTTG) + "</td>";
+    message += "<td>" + String(vvalve[i].iFB,HEX) + "</td><tr>\r\n";
+    server.sendContent(message) ;
+    message = "" ;
+  }
+  message = F("</table><br>\r\n") ;
+  server.sendContent(message) ;
+
+
   SendHTTPPageFooter();  
 }
 

@@ -15,17 +15,25 @@ String message ;
   }
   Serial.println(message);
 }
+void SendHTTPHeader(void){
+  SendHTTPHeader(0);
+}  
 
-void SendHTTPHeader(){
+void SendHTTPHeader(int iRefresh){
 String message ;
 String strTmp = "" ;
+//  setCpuFrequencyMhz(240);
+
   server.sendHeader(F("Server"),F("ESP32-on-beetle-juice"),false);
   server.sendHeader(F("X-Powered-by"),F("Dougal-filament-7"),false);
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
   message = F("<!DOCTYPE HTML>");
   message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
-  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>");
+  message += F("<meta name=viewport content='width=320, auto inital-scale=1'>"); 
+  if ( iRefresh > 0 ){
+    message += "<meta http-equiv='Refresh' content='"+String(iRefresh)+"'>" ;
+  }
   message += F("</head><body><html><center><h3>");   
   if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
     strTmp = String(ADC_Value) + " " + String(ghks.ADC_Unit) ;
@@ -45,7 +53,7 @@ void SendHTTPPageFooter(){
   message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
   message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>\r\n" ;
   message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>\r\n") ;
-//  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
+  message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
   message += F("<a href='/setup'>Node Setup</a><br>\r\n");
   message += F("<a href='/email'>Email Setup</a><br>\r\n");  
   message += F("<a href='/adc'>ADC Setup</a><br>\r\n");  
@@ -67,6 +75,7 @@ void SendHTTPPageFooter(){
   message += F("</body></html>\r\n\r\n") ;
   server.sendContent(message) ;  
   message = "" ;       
+//  SetSelectedSpeed();
 }
 
 
@@ -404,17 +413,9 @@ void handleRoot() {
   }else{
     server.sendContent(F("<a href='/prognew'>Programs</a><br>")) ;             
   }
+  
+  SendCurrentTime();
 
-  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
-  if (ghks.fTimeZone > 0 ) {
-    server.sendContent("<b>"+ String(buff) + " UTC +" + String(ghks.fTimeZone,1) ) ;   
-  }else{
-    server.sendContent("<b>"+ String(buff) + " UTC " + String(ghks.fTimeZone,1) ) ;       
-  }
-  if ( year() < 2000 ) {
-    server.sendContent(F("  --- CLOCK NOT SET ---")) ;
-  }
-  server.sendContent(F("</b><br>")) ;  
   if ( ghks.AutoOff_t > now() )  {
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(ghks.AutoOff_t), month(ghks.AutoOff_t), day(ghks.AutoOff_t) , hour(ghks.AutoOff_t), minute(ghks.AutoOff_t), second(ghks.AutoOff_t));
     server.sendContent(F("<b><font color=red>Automation OFFLINE Untill ")) ;  
@@ -669,5 +670,20 @@ void handleRoot() {
   SendHTTPPageFooter();
 }
 
+void SendCurrentTime(void){
+  String message ;
+
+  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
+  if (ghks.fTimeZone > 0 ) {
+    message = "<b>"+ String(buff) + " UTC +" + String(ghks.fTimeZone,1)  ;   
+  }else{
+    message = "<b>"+ String(buff) + " UTC " + String(ghks.fTimeZone,1) ;       
+  }
+  if ( year() < 2000 ) {
+    message += F("  --- CLOCK NOT SET ---") ;
+  }
+  message += F("</b><br>") ;
+  server.sendContent(message) ;  
+}
 
 
