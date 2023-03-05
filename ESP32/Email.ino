@@ -693,7 +693,7 @@ void ResetSMTPInfo(){
   Serial.println(F("*** ResetSMTPInfo Called ***"));  
   SMTP.iLoRaScanInterval = -1 ;
   SMTP.iBusScanInterval = -1 ;
-  SMTP.iLoRaTimeOut = 120 ;
+  SMTP.iLoRaTimeOut = 180 ;
 }
 
 

@@ -50,6 +50,9 @@ void handleInfo(){
 //  server.sendContent("<tr><td>Get Sketch Size</td><td align=center>" + String(ESP.getSketchSize()) + "</td><td>(Bytes)</td></tr>" ) ;    
 //  server.sendContent("<tr><td>Free Sketch Space</td><td align=center>" + String(ESP.getFreeSketchSpace()) + "</td><td>(Bytes)</td></tr>" ) ;    
   server.sendContent("<tr><td>Magnetic Sensor Value</td><td align=center>" + String(magval) + "</td><td>(?)</td></tr>" ) ;    
+  server.sendContent("<tr><td>LoRa Bandwidth</td><td align=center>" + String(LoRa.getSignalBandwidth()) + "</td><td>(kBps)</td></tr>" ) ;    
+  server.sendContent("<tr><td>LoRa Spreading Factor</td><td align=center>" + String(LoRa.getSpreadingFactor()) + "</td><td>(?)</td></tr>" ) ;    
+  
 
   snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
   server.sendContent("<tr><td>Computer Uptime</td><td align=center>"+String(buff)+"</td><td>(day:hr:min)</td></tr>" ) ;
@@ -67,20 +70,47 @@ void handleSetup(){
   String MyColor ;
   String MyColor2 ;
   byte mac[6];
-  String strCPU13 = "";
-  String strCPU26 = "";
-  String strCPU80 = "";
-  String strCPU160 = "";
-  String strCPU240 = "";      
- 
+  String strSelected = "";
+  String strOption = "" ; 
 
-  SerialOutParams();
+//  SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
+
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 369:  
+          ResetLoRaParams();
+        break;
+      }  
+    }
+
+    
+    i = String(server.argName(j)).indexOf("lrspr");
+    if (i != -1){  // 
+      ghks.iSpread = String(server.arg(j)).toInt() ;
+      ghks.iSpread = constrain(ghks.iSpread,5,12);
+    }        
+    i = String(server.argName(j)).indexOf("lrpwr");
+    if (i != -1){  // 
+      ghks.iTXPower = String(server.arg(j)).toInt() ;
+      ghks.iTXPower = constrain(ghks.iTXPower,2,20);
+    }        
+    i = String(server.argName(j)).indexOf("lrfre");
+    if (i != -1){  // 
+      ghks.iFreq = String(server.arg(j)).toInt() ;
+      ghks.iFreq = constrain(ghks.iFreq,9150,9285);
+    }        
+    i = String(server.argName(j)).indexOf("lrban");
+    if (i != -1){  // 
+      ghks.iBandWidth = String(server.arg(j)).toInt() ;
+      ghks.iBandWidth = constrain(ghks.iBandWidth,0,9);
+    }        
     i = String(server.argName(j)).indexOf("ptime");
     if (i != -1){  // 
       ghks.lPulseTime = String(server.arg(j)).toInt() ;
-      ghks.lPulseTime = constrain(ghks.lPulseTime,10,1000);
+      ghks.lPulseTime = constrain(ghks.lPulseTime,10,255);
     }        
     i = String(server.argName(j)).indexOf("ndadd");
     if (i != -1){  // 
@@ -96,6 +126,12 @@ void handleSetup(){
     i = String(server.argName(j)).indexOf("disop");
     if (i != -1){  // 
       ghks.lDisplayOptions = String(server.arg(j)).toInt() ;
+      ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
+    }  
+    i = String(server.argName(j)).indexOf("disro");
+    if (i != -1){  // 
+      ii =(( 0x01 & String(server.arg(j)).toInt()) << 1 ) ;
+      ghks.lDisplayOptions = ( ghks.lDisplayOptions & 0xFD ) | ii ;
       ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
     }  
     i = String(server.argName(j)).indexOf("cpufr");
@@ -213,10 +249,10 @@ void handleSetup(){
   SendHTTPHeader();
 
   message += "<form method=post action=" + server.uri() + "><table border=1 title='Node Settings'>";
-  message += F("<tr><th>Parameter</th><th>Value</th><th><input type='submit' value='SET'></th></tr>");
+  message += F("<tr><th>Parameter</th><th>Value</th><th><input type='submit' value='SET'></th></tr>\r\n");
 
   message += F("<tr><td>Controler Name</td><td align=center>") ; 
-  message += "<input type='text' name='cname' value='"+String(ghks.NodeName)+"' maxlength=15 size=12></td><td></td></tr>";
+  message += "<input type='text' name='cname' value='"+String(ghks.NodeName)+"' maxlength=15 size=12></td><td></td></tr>\r\n";
 
   snprintf(buff, BUFF_MAX, "%04d/%02d/%02d %02d:%02d", year(ghks.AutoOff_t), month(ghks.AutoOff_t), day(ghks.AutoOff_t) , hour(ghks.AutoOff_t), minute(ghks.AutoOff_t));
   if (ghks.AutoOff_t > now()){
@@ -225,87 +261,63 @@ void handleSetup(){
     MyColor =  "" ;
   }
   message += "<tr><td "+String(MyColor)+">Auto Off Until</td><td align=center>" ; 
-  message += "<input type='text' name='atoff' value='"+ String(buff) + "' size=12></td><td>(yyyy/mm/dd)</td></tr>";
+  message += "<input type='text' name='atoff' value='"+ String(buff) + "' size=12></td><td>(yyyy/mm/dd)</td></tr>\r\n";
 
   message += F("<tr><td>Activation Pulse</td><td align=center>") ; 
-  message += "<input type='text' name='ptime' value='" + String(ghks.lPulseTime) + "' size=12></td><td>(ms)</td></tr>";
+  message += "<input type='text' name='ptime' value='" + String(ghks.lPulseTime) + "' size=12></td><td>(ms)</td></tr>\r\n";
 
   message += F("<tr><td>Node Address</td><td align=center>") ; 
-  message += "<input type='text' name='ndadd' value='" + String(ghks.lNodeAddress) + "' size=12></td><td>"+String(ghks.lNodeAddress & 0xff)+"</td></tr>";
+  message += "<input type='text' name='ndadd' value='" + String(ghks.lNodeAddress) + "' size=12></td><td>"+String(ghks.lNodeAddress & 0xff)+"</td></tr>\r\n";
 
   message += F("<tr><td>Time Zone</td><td align=center>") ; 
-  message += "<input type='text' name='tzone' value='" + String(ghks.fTimeZone,1) + "' size=12></td><td>(Hours)</td></tr>";
+  message += "<input type='text' name='tzone' value='" + String(ghks.fTimeZone,1) + "' size=12></td><td>(Hours)</td></tr>\r\n";
 
   server.sendContent(message) ;
   message = "" ;
       
   message += F("<tr><td>CPU Frequency</td><td align=center>") ; 
   message += F("<select name='cpufr'>") ;
-  switch(ghks.cpufreq){
-    case 13:
-      strCPU13 = F("SELECTED");
-      strCPU26 = "";
-      strCPU80 = "";
-      strCPU160 = "";
-      strCPU240 = "";      
-    break;  
-    case 26:
-      strCPU13 = "";
-      strCPU26 = F("SELECTED");
-      strCPU80 = "";
-      strCPU160 = "";
-      strCPU240 = "";      
-    break;  
-    case 80:
-      strCPU13 = "";
-      strCPU26 = "";
-      strCPU80 = F("SELECTED");
-      strCPU160 = "";
-      strCPU240 = "";      
-    break;  
-    case 120:
-      strCPU13 = "";
-      strCPU26 = "";
-      strCPU80 = "" ;
-      strCPU160 = F("SELECTED");
-      strCPU240 = "";      
-    break;
-    default: // 240 
-      strCPU13 = "";
-      strCPU26 = "";
-      strCPU80 = "" ;
-      strCPU160 = "";
-      strCPU240 = F("SELECTED");      
-    break;
+  for ( j = 0 ; j <= 4 ; j++ ) {
+    strOption = CPUSpeedTextLUT(j,&ii);
+    if ( ghks.cpufreq == ii ){
+      strSelected = "SELECTED" ;
+    }else{
+      strSelected = "" ;
+    }
+    message += "<option value='"+String(ii)+"' " + strSelected + ">" + strOption + "\r\n"; 
   }
-  
-  message += "<option value='13' " + strCPU13 + ">13 Mhz - Glacial - Danger Will Robinson"; 
-  message += "<option value='26' " + strCPU26 + ">26 Mhz - Sloooow - Danger Will Robinson"; 
-  message += "<option value='80'" + strCPU80 + ">80 Mhz - Slow - Low Power"; 
-  message += "<option value='160'" + strCPU160 + ">160MHz"; 
-  message += "<option value='240'" + strCPU240 + ">240MHz - Fast - High Power"; 
-  
-  message += F("</select></td><td>(MHz)</td></tr>");
+  message += F("</select></td><td>(MHz)</td></tr>\r\n");
 
-  message += F("<tr><td>Display Options</td><td align=center>") ; 
+  message += F("<tr><td>Display Option</td><td align=center>") ; 
   message += F("<select name='disop'>") ;
-  if (ghks.lDisplayOptions == 0 ){
+  if ((ghks.lDisplayOptions & 0x01 ) == 0 ){
     message += F("<option value='0' SELECTED>0 - Normal"); 
     message += F("<option value='1'>1 - Invert"); 
   }else{
     message += F("<option value='0'>0 - Normal"); 
     message += F("<option value='1' SELECTED>1 - Invert"); 
   }
-  message += F("</select></td><td></td></tr>");
+  message += F("</select></td><td></td></tr>\r\n");
 
-  message += F("<tr><td>Turn Display off after</td><td align=center>") ; 
-  message += "<input type='text' name='dotmr' value='" + String(ghks.displaytimer) + "' size=4 maxlength=3></td><td>(min) 0 - disables</td></tr>";
+  message += F("<tr><td>Display Option</td><td align=center>") ; 
+  message += F("<select name='disro'>") ;
+  if (((ghks.lDisplayOptions & 0x02 ) >> 1 ) == 0 ){
+    message += F("<option value='0' SELECTED>0 - Always On"); 
+    message += F("<option value='1'>1 - Go off with WiFi"); 
+  }else{
+    message += F("<option value='0'>0 - Always On"); 
+    message += F("<option value='1' SELECTED>1 - Go off with WiFi"); 
+  }
+  message += F("</select></td><td></td></tr>\r\n");
+
+  message += F("<tr><td>Turn Wifi and Display off after</td><td align=center>") ; 
+  message += "<input type='text' name='dotmr' value='" + String(ghks.displaytimer) + "' size=4 maxlength=3></td><td>(min) 0 - disables</td></tr>\r\n";
 
   message += F("<tr><td>Mag Switch Level</td><td align=center>") ; 
-  message += "<input type='text' name='magsn' value='" + String(ghks.magsens) + "' size=4 maxlength=5></td><td>(?)</td></tr>";
+  message += "<input type='text' name='magsn' value='" + String(ghks.magsens) + "' size=4 maxlength=5></td><td>(?)</td></tr>\r\n";
 
   message += F("<tr><td>Display Number of Valves</td><td align=center>") ; 
-  message += "<input type='text' name='maxvn' value='" + String(ghks.lMaxDisplayValve) + "' size=4 maxlength=2></td><td>2 - "+String(MAX_VALVE)+"</td></tr>";
+  message += "<input type='text' name='maxvn' value='" + String(ghks.lMaxDisplayValve) + "' size=4 maxlength=2></td><td>2 - "+String(MAX_VALVE)+"</td></tr>\r\n";
 
   message += F("<tr><td>Program Method</td><td align=center>") ; 
   message += F("<select name='prgop'>") ;
@@ -316,41 +328,67 @@ void handleSetup(){
     message += F("<option value='0'>0 By Valve"); 
     message += F("<option value='1' SELECTED>1 By Progam / Shift"); 
   }
-  message += F("</select></td><td></td></tr></form>");
+  message += F("</select></td><td></td></tr></form>\r\n");
   server.sendContent(message) ;
   message = "" ;
   
-  message += "<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>" ; 
+  message += "<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>\r\n" ; 
 
   message += F("<tr><td>Local UDP Port NTP</td><td align=center>") ; 
-  message += "<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td><input type='submit' value='SET'></td></tr>";
+  message += "<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td><input type='submit' value='SET'></td></tr>\r\n";
 
   message += F("<tr><td>Local UDP Port Control</td><td align=center>") ; 
-  message += "<input type='text' name='lpctr' value='" + String(ghks.localPortCtrl) + "' size=12></td><td></td></tr>";
+  message += "<input type='text' name='lpctr' value='" + String(ghks.localPortCtrl) + "' size=12></td><td></td></tr>\r\n";
 
   message += F("<tr><td>Remote UDP Port Control</td><td align=center>") ; 
-  message += "<input type='text' name='rpctr' value='" + String(ghks.RemotePortCtrl) + "' size=12></td><td></td></tr>";
+  message += "<input type='text' name='rpctr' value='" + String(ghks.RemotePortCtrl) + "' size=12></td><td></td></tr>\r\n";
 
   message += F("<tr><td>Network SSID</td><td align=center>") ; 
-  message += "<input type='text' name='nssid' value='" + String(ghks.nssid) + "' maxlength=15 size=12></td><td></td></tr>";
+  message += "<input type='text' name='nssid' value='" + String(ghks.nssid) + "' maxlength=15 size=12></td><td></td></tr>\r\n";
 
   message += F("<tr><td>Network Password</td><td align=center>") ; 
-  message += "<input type='text' name='npass' value='" + String(ghks.npassword) + "' maxlength=15 size=12></td><td></td></tr>";
+  message += "<input type='text' name='npass' value='" + String(ghks.npassword) + "' maxlength=15 size=12></td><td></td></tr>\r\n";
 
   message += F("<tr><td>Configure Password</td><td align=center>") ; 
-  message += "<input type='text' name='cpass' value='" + String(ghks.cpassword) + "' maxlength=15 size=12></td><td></td></tr>";
+  message += "<input type='text' name='cpass' value='" + String(ghks.cpassword) + "' maxlength=15 size=12></td><td></td></tr>\r\n";
 
   message += F("<tr><td>Time Server</td><td align=center>") ; 
-  message += "<input type='text' name='timsv' value='" + String(ghks.timeServer) + "' maxlength=23 size=12></td><td></td></tr>";
+  message += "<input type='text' name='timsv' value='" + String(ghks.timeServer) + "' maxlength=23 size=12></td><td></td></tr>\r\n";
 
   snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.RCIP[0],ghks.RCIP[1],ghks.RCIP[2],ghks.RCIP[3]);
   message += F("<tr><td>Remote IP Address Control</td><td align=center>") ; 
   message += "<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr></form>";
+  server.sendContent(message) ;
+  message = "" ;
+
+  message += "<tr><td><b>LoRa Stuff</b></td><td><form method=post action=" + server.uri() + "><input type='hidden' name='command' value='369'><input type='submit' value='Reset LoRa Parameters'></form></td><td><form method=post action=" + server.uri() + "><input type='submit' value='SET'></td></tr>\r\n" ; 
+
+  message += F("<tr><td>Frequency</td><td align=center>") ; 
+  message += "<input type='text' name='lrfre' value='" + String(ghks.iFreq) + "' maxlength=4 size=12></td><td>(MHz) x10</td></tr>\r\n";
+
+  message += F("<tr><td>Spreading Factor</td><td align=center>") ; 
+  message += "<input type='text' name='lrspr' value='" + String(ghks.iSpread) + "' maxlength=2 size=12></td><td>(?)6-12</td></tr>\r\n";
+  
+  message += F("<tr><td>Power</td><td align=center>") ; 
+  message += "<input type='text' name='lrpwr' value='" + String(ghks.iTXPower) + "' maxlength=2 size=12></td><td>(dB) 2-20</td></tr>\r\n";
+
+  message += F("<tr><td>Bandwidth</td><td align=center>") ; 
+  message += "<select name='lrban'>" ;
+  for ( j = 0 ; j <= 9 ; j++ ) {
+    if ( ghks.iBandWidth == j ){
+      strSelected = "SELECTED" ;
+    }else{
+      strSelected = "" ;
+    }
+    message += "<option value='"+String(j)+"' " + strSelected + ">"+BandWidthText(j)+"\r\n"; 
+  }
+  message += "</select></td><td>(KBps)</td></tr></form>";
+//  message += "<tr><td colspan=3 align='center'><form method=post action=" + server.uri() + "><input type='hidden' name='command' value='369'><input type='submit' value='Reset LoRa Parameters'></form></td></tr>\r\n" ; 
   
   server.sendContent(message) ;
   message = "" ;
 
-  message += "<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>" ; 
+  message += "<form method=postaction=" + server.uri() + "><tr><td></td><td></td><td></td></tr>" ; 
 
   message += F("<tr><td>Network Options</td><td align=center>") ; 
   message += F("<select name='netop'>") ;
@@ -409,3 +447,71 @@ void IndicateReboot(void){
     display.display();    
     ESP.restart() ;
 }
+
+String CPUSpeedTextLUT(int Option , int *speedvalue){
+String tmpStr = "" ;
+
+  switch(Option){
+    case 0:
+      tmpStr = "13 Mhz - Glacial - Danger Will Robinson" ;
+      *speedvalue = 13 ;
+    break;    
+    case 1:
+      tmpStr = "26 Mhz - Sloooow - Danger Will Robinson" ;
+      *speedvalue = 26 ;
+    break;    
+    case 2:
+      tmpStr = "80 Mhz - Slow - Low Power" ;
+      *speedvalue = 80 ;
+    break;    
+    case 3:
+      tmpStr = "160MHz" ;
+      *speedvalue = 160 ;     
+    break;  
+    case 4:  
+    default:
+      tmpStr = "240MHz - Fast - High Power" ;
+      *speedvalue = 240 ;
+    break;    
+  }
+  return(tmpStr);  
+}
+
+String BandWidthText(uint8_t bw_no){
+String tmpStr = "" ;  
+  switch(bw_no){
+    case 0:
+      tmpStr = "7.8" ;
+    break;
+    case 1:
+      tmpStr = "10.4" ;
+    break;
+    case 2:
+      tmpStr = "15.6" ;
+    break;
+    case 3:
+      tmpStr = "20.8" ;
+    break;
+    case 4:
+      tmpStr = "31.25" ;
+    break;
+    case 5: 
+      tmpStr = "41.7" ;
+    break;
+    case 6:
+      tmpStr = "62.5" ;
+    break;
+    case 7:
+      tmpStr = "125" ;
+    break;
+    case 8:
+      tmpStr = "250" ;
+    break;
+    default:
+      tmpStr = "500" ;
+    break;
+  }
+  return(tmpStr);
+}
+
+

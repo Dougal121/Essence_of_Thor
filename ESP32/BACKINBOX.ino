@@ -1,7 +1,21 @@
-void BackInTheBoxMemory(){
+void ResetLoRaParams(void){
+  ghks.iFreq = 9150 ;
+  ghks.iBandWidth = 7 ;
+  ghks.iSpread = 7 ;
+  ghks.iTXPower = 17 ;
+}
+
+void BackInTheBoxMemory(void){
   uint8_t i , j ;
 
+  ResetLoRaParams();
+  
   ghks.lProgMethod = 1 ;
+  ghks.cpufreq = 240 ;
+  ghks.displaytimer = 60 ;
+  ghks.magsens = 128 ;
+  
+  
   for (i = 0 ; i < MAX_SHIFTS  ; i++ ) {   // NEW PROGRAMMING   ------   Clear all these
     pn.sh[i].Program = 0 ;
     if ( i == 0 ){
@@ -66,7 +80,8 @@ void BackInTheBoxMemory(){
     evalve[i].Flowrate = 1.0 ;
    
     evalve[i].FeedbackBoardBit = 0xa0 + i ;  // board 10
-
+    evalve[i].OnOffPolPulse = 0x44 ;
+    
     evalve[i].Filter = 0 ;
     evalve[i].Node = 0 ;
     evalve[i].Valve = 0 ;
@@ -140,7 +155,6 @@ void BackInTheBoxMemory(){
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
   
 
-  sprintf(ghks.NodeName,"Prickle Patch\0") ;
 
   sprintf(ghks.cpassword,"\0");
   
@@ -226,7 +240,6 @@ void BackInTheBoxMemory(){
 #endif           
   }
   ResetADCCalInfo;
-  
 }
 
 void LoadParamsFromEEPROM(bool bLoad){
@@ -241,17 +254,26 @@ int eeAddress ;
     eeAddress = sizeof(ghks) ;
     Serial.println("read - ghks structure size " +String(eeAddress));   
 
-    ghks.lPulseTime = constrain(ghks.lPulseTime,10,1000);
     ghks.lNodeAddress = constrain(ghks.lNodeAddress,0,32768);
     ghks.fTimeZone = constrain(ghks.fTimeZone,-12,12);
     ghks.localPort = constrain(ghks.localPort,1,65535);
     ghks.localPortCtrl = constrain(ghks.localPortCtrl,1,65535);
     ghks.RemotePortCtrl = constrain(ghks.RemotePortCtrl,1,65535);
+    if ( ghks.iBandWidth > 9 ){
+      ghks.iBandWidth = 9 ;
+    }
+    ghks.iBandWidth = constrain(ghks.iBandWidth,0,9);   
+    ghks.iFreq = constrain(ghks.iFreq,9150,9285);
+    ghks.lPulseTime = constrain(ghks.lPulseTime,10,255);
+    
     if ( year(ghks.AutoOff_t) < 2000 ){
        ghks.AutoOff_t = now();
     }
     ghks.lProgMethod = constrain(ghks.lProgMethod,0,1);
-    ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,1);
+    ghks.iSpread = constrain(ghks.iSpread,5,12);
+    ghks.iTXPower = constrain(ghks.iTXPower,2,20);
+    
+    ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
     if ( ghks.lMaxDisplayValve <= 0 ){
       ghks.lMaxDisplayValve = MAX_VALVE ;
     }

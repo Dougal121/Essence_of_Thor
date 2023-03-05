@@ -274,8 +274,13 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   unsigned int localPort = 2390;          // 2 local port to listen for NTP UDP packets
   unsigned int localPortCtrl = 8666;      // 4 local port to listen for Control UDP packets
   unsigned int RemotePortCtrl = 8664;     // 6 local port to listen for Control UDP packets
-  long lProgMethod ;                      // 10
-  long lPulseTime ;                       // 14
+  uint8_t lProgMethod ;                      // 10
+  uint8_t iSpread ;                       // LoRa Spread Factor
+  uint8_t iTXPower ;                      // LoRa TX Power   
+  uint8_t  SPARE ;
+  uint8_t lPulseTime ;                    // 14  this is the gap between valves
+  int     iFreq ;                         //  LoRa Frequency
+  uint8_t iBandWidth ;                    //  LoRa Bandwidth
   long lMaxDisplayValve ;                 // 18
   long lNodeAddress ;                     // 22 
   float fTimeZone ;                       // 26 
@@ -287,7 +292,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
 //  long lDisplayOptions  ;               // 86 
   uint8_t lDisplayOptions ;
   uint8_t cpufreq ;                       //    240 160 80   not flash at 26
-  uint8_t displaytimer ;                  //     how log does the display stay on for (minutes) ?  0 fo display on always
+  uint8_t displaytimer ;                  //     how log does the wifi stay on for (minutes) ?  0 fo display on always (display piggbacks on this)
   uint8_t magsens ;                       //     magnet sensor sesitivity use instead of the button
   uint8_t lNetworkOptions  ;              // 84 
   uint8_t ValveLogOptions  ;              // 85 
@@ -533,6 +538,8 @@ int NumberOK (float target) {
 //  ############################################## SETUP  #################################################################  SETUP   #############################
 void setup() {
 int i , k , j = 0; 
+float tmpbw = 125.0 ;
+long  bw = 125000 ;
   
   lRebootCode = random(1,+2147483640) ;  // want to change it straight away
   chipid=ESP.getEfuseMac();         //The chip ID is essentially its MAC address(length: 6 bytes).
@@ -774,12 +781,21 @@ int i , k , j = 0;
   lRebootCode = random(1,+2147483640) ;
 
   LoRa.setPins(SS, RST, DIO0); 
-  while (!LoRa.begin(BAND) && (j < 10)) 
+  tmpbw = BandWidthText(ghks.iBandWidth).toFloat() * 1000 ;
+  bw = (long) tmpbw ;
+//  Serial.println("Setting LoRa Bandwidth " + String(bw));
+//  LoRa.setSignalBandwidth(bw) ;
+  
+  while (!LoRa.begin(ghks.iFreq * 100000 ) && (j < 10)) 
   {
     Serial.print(".");
     j++;
     delay(500);
   }
+  Serial.println("Setting LoRa Bandwidth/power/spreading factor ");
+  LoRa.setSignalBandwidth(bw) ;
+  LoRa.setTxPower((int)ghks.iTXPower)  ;
+  LoRa.setSpreadingFactor((int)ghks.iSpread)  ;
   
   if (j == 10) {
     Serial.println("Starting LoRa failed");    
@@ -1039,9 +1055,11 @@ int iLoRaReturn = 0 ;
         display.drawCircle(i*8+3, 41, 1);
       }       
     }
-    if (( iDisplayCountDown == 0 ) && ( ghks.displaytimer > 0 ))
-      display.clear();  // turn off all the pixels
-    display.display();
+    if (( iDisplayCountDown == 0 ) && ( ghks.displaytimer > 0 ) && ((ghks.lDisplayOptions & 0x02 ) != 0 )){
+ //     display.clear();  // turn off all the pixels  ??? required as we never send them out the bus
+    }else{  
+      display.display();
+    }
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( bDirty ) {
         vvalve[i].lTTC = evalve[i].lTTC ;                                          // if dirty then start all the timers again
@@ -1355,25 +1373,27 @@ int iLoRaReturn = 0 ;
         }
       }
     }
-    if ( lMinLoRaScan > 0 ) {
-      lMinLoRaScan -- ;
-    }
-    if (lMinLoRaScan == 0 ) {
-      if (SMTP.iLoRaScanInterval>0) {
-        iLoRaReturn = LoRaCheck();
-        if (( iLoRaReturn != 0 ) && bLoRaGood ){
-          if ( SMTP.bUseEmail ) {
-            SendEmailToClient(668); 
-          }
-          bLoRaGood = false ;
-        }
-        if ( SMTP.iLoRaScanInterval < MINLORASCANINTERVAL ){
-          lMinLoRaScan = MINLORASCANINTERVAL ;          
-        }else{
-          lMinLoRaScan = SMTP.iLoRaScanInterval ;          
-        }
+    if ( bLoRa ){                     // if LoRa is found and initalised otherwise dont care.
+      if ( lMinLoRaScan > 0 ) {
+        lMinLoRaScan -- ;
       }
-    }    
+      if (lMinLoRaScan == 0 ) {
+        if (SMTP.iLoRaScanInterval>0) {
+          iLoRaReturn = LoRaCheck();
+          if (( iLoRaReturn != 0 ) && bLoRaGood ){
+            if ( SMTP.bUseEmail ) {
+              SendEmailToClient(668); 
+            }
+            bLoRaGood = false ;
+          }
+          if ( SMTP.iLoRaScanInterval < MINLORASCANINTERVAL ){
+            lMinLoRaScan = MINLORASCANINTERVAL ;          
+          }else{
+            lMinLoRaScan = SMTP.iLoRaScanInterval ;          
+          }
+        }
+      }    
+    }
     if ((ghks.ValveLogOptions & 0x80 )!=0 ){
       UpDateValveLogs();
     }
@@ -1482,6 +1502,8 @@ int iLoRaReturn = 0 ;
       }else{
         iDisplayCountDown = 0 ;   // turn off display
         StopWiFi();
+        display.clear();
+        display.display();  // blank the display
         SetSelectedSpeed();
       }
       bButton = true ;  

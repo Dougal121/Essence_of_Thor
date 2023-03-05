@@ -42,7 +42,10 @@ String strTmp = "" ;
   }  
   message += String(WiFi.RSSI()) + " (dBm) <a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>\r\n";
   server.sendContent(message) ;  
-  message = "" ;       
+  message = "" ;   
+  if ((ghks.displaytimer > 0) || (iDisplayCountDown != 0 )) {   // stop the display balnking out while we are woking on the interface
+    iDisplayCountDown = ghks.displaytimer ;    
+  }
 }
 
 
@@ -517,8 +520,12 @@ void handleRoot() {
 
   
   if (bDefault) {     // #####################################   default valve control and setup  ##############################################
-    server.sendContent(F("<br><b>Logical Valve Control</b>"));
-    message = F("<table border=1 title='Logical Valve Control'>") ;
+    message =  F("<br><b>Logical Valve Control - Node ") ;
+    message += String(ghks.lNodeAddress) + "</b>";
+    if ( bLoRa){
+      message += " ("+String(ghks.iFreq)+"-"+String(ghks.iSpread)+"-"+String(ghks.iTXPower)+"-"+BandWidthText(ghks.iBandWidth)+")";
+    }
+    message += F("<table border=1 title='Logical Valve Control'>") ;
     message += F("<tr><th rowspan=2>Valve</th>") ;               // first heading row of table ( there are 2 )
     if (bExtraValve) {
       if (iPage == 1 ){
