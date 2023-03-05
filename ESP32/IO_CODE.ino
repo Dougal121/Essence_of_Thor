@@ -59,7 +59,7 @@ int j ;
       }
     break;
     case 1:  // MCP23017
-      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
+//      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
       for ( ii = 0 ; ii < MAX_MCP23017 ; ii ++ ) { // scan all the possible port expanders
 //        Serial.println("eboard.address " + String(eboard[Board].Address) + " Physical " + String(mcp[ii].getaddress())  ) ;
         if (eboard[Board].Address == ( mcp[ii].getaddress() + 0x20) ){
@@ -76,7 +76,7 @@ int j ;
             j = mcp_relay_tranlate[Bit] ;
           break;
         }
-        Serial.println("MCP23017 Output " + String(j) + " Board " + String(k) + " time " + String(PulseTime) + " state " + String(State));
+//        Serial.println("MCP23017 Output " + String(j) + " Board " + String(k) + " time " + String(PulseTime) + " state " + String(State));
         if ( PulseTime > 0 ){
           mcp[k].pulsepin(j,PulseTime,State) ;        
         }else{
@@ -85,7 +85,7 @@ int j ;
       }
     break;
     case 2:  // LOCAL I/O
-      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
+//      Serial.println("Activate Output Bit " + String(Bit) + " Board " + String(Board) + " Pulse Time " + String(PulseTime) + " State " + String(State));
       if (( Bit < MAX_LOCAL_IO ) && ( LocalPINOK(elocal.IOPin[Bit]))){
         if ((( elocal.IOPin[Bit] >= 0 ) && ( elocal.IOPin[Bit] < MaxPinPort)) && ( elocal.IOPin[Bit] != 255 ))   {
           if ( PulseTime > 0 ){
@@ -236,6 +236,7 @@ void ioScan() {
   uint8_t j , k , kk ;
   uint8_t BoardBit ;
   String message ;  
+  String message2 ;  
   String bgcolor ;  
 /*
   message = "Web Request URI: ";
@@ -276,16 +277,17 @@ void ioScan() {
   }
   SendHTTPHeader();
 
-  server.sendContent(F("<br><center><b>I/O DB Check</b><br><table border=1 title='I/O DB Check'><tr><th rowspan=2>Board</th><th rowspan=2>I2C<br>Address</th><th rowspan=2>Board<br>Type</th><th rowspan=2>Bit<br>Mapping</th><th rowspan=2>.</th><th colspan=16>Output / Input</th></tr><tr>"));
+  message = F("<br><center><b>I/O DB Check</b><br><table border=1 title='I/O DB Check'><tr><th rowspan=2>Board</th><th rowspan=2>I2C<br>Address</th><th rowspan=2>Board<br>Type</th><th rowspan=2>Bit<br>Mapping</th><th rowspan=2>.</th><th colspan=16>Output / Input</th></tr><tr>");
   for (i = 0; i < 16; i++) {
-    server.sendContent("<th>"+String(i,HEX)+"</th>");
+    message += "<th>"+String(i,HEX)+"</th>";
   }
-  server.sendContent(F("</tr>"));
+  message += F("</tr>\r\n");
+  server.sendContent(message);
+  message = "" ;
   
   for (i = 0; i < MAX_BOARDS ; i++) {                             // for each board
-    server.sendContent(F("<tr>"));
-    server.sendContent("<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='a"+String(i)+"'>");
-    message = "" ;
+    message += F("<tr>");
+    message += "<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='a"+String(i)+"'>";
     switch (eboard[i].Type){
       case 0:
         for (ii = 0; ii < 8; ii++) {
@@ -332,82 +334,84 @@ void ioScan() {
         }
       break;
     }
-    server.sendContent(message);
-    server.sendContent("</select></td><td><select name='t"+String(i)+"'>");
+    message += "</select></td><td><select name='t"+String(i)+"'>";
     switch (eboard[i].Type){
       case 0:
-        server.sendContent( F("<option value='0' SELECTED >PCF8574 <option value='1' >MCP23017 <option value='2' >Local I/O<option value='3' >-- None --")) ;    
+        message +=  F("<option value='0' SELECTED >PCF8574 <option value='1' >MCP23017 <option value='2' >Local I/O<option value='3' >-- None --") ;    
       break;
       case 1:
-        server.sendContent( F("<option value='0' >PCF8574 <option value='1' SELECTED >MCP23017 <option value='2' >Local I/O<option value='3' >-- None --")) ;    
+        message +=  F("<option value='0' >PCF8574 <option value='1' SELECTED >MCP23017 <option value='2' >Local I/O<option value='3' >-- None --") ;    
       break;
       case 2:
-        server.sendContent( F("<option value='0' >PCF8574 <option value='1' >MCP23017 <option SELECTED value='2' >Local I/O<option value='3' >-- None --")) ;    
+        message +=  F("<option value='0' >PCF8574 <option value='1' >MCP23017 <option SELECTED value='2' >Local I/O<option value='3' >-- None --") ;    
       break;
       default:
-        server.sendContent( F("<option value='0' >PCF8574 <option value='1' >MCP23017 <option value='2' >Local I/O<option SELECTED value='3' >-- None --")) ;    
+        message +=  F("<option value='0' >PCF8574 <option value='1' >MCP23017 <option value='2' >Local I/O<option SELECTED value='3' >-- None --") ;    
       break;
     }
-    server.sendContent(F("</select></td><td>"));
-    server.sendContent("<select name='m"+String(i)+"'>");
+    message += F("</select></td><td>");
+    message += "<select name='m"+String(i)+"'>" ;
     switch (eboard[i].Translate){
       case 0:
-        server.sendContent( F("<option value='0' SELECTED>None <option value='1' >DIL AB")) ;    
+        message +=  F("<option value='0' SELECTED>None <option value='1' >DIL AB") ;    
       break;
       default:
-        server.sendContent( F("<option value='0'>None <option value='1' SELECTED>DIL AB")) ;    
+        message +=  F("<option value='0'>None <option value='1' SELECTED>DIL AB") ;    
       break;
     }    
-    server.sendContent(F("</select></td><td><input type='submit' value='SET'></form></td>"));
+    message += F("</select></td><td><input type='submit' value='SET'></form></td>");
     for (j = 0 ; j < 16 ; j ++ ){     //   each bit on each board
       BoardBit = ( i << 4 ) | j ;
-      message = "" ;
+      message2 = "" ;
       bgcolor = "" ;
       for ( k = 0 ; k < MAX_VALVE ; k ++ ) {
         if (( evalve[k].OnCoilBoardBit == BoardBit ) && ( evalve[k].OnCoilBoardBit == evalve[k].OffCoilBoardBit )){
-          message += "V"+String(k+1) ;  
+          message2 += "V"+String(k+1) ;  
           bgcolor = F("bgcolor = 'Lime'") ;          
         }else{
           if ( evalve[k].OnCoilBoardBit == BoardBit ){
-            message += "VE"+String(k+1) ;  
+            message2 += "VE"+String(k+1) ;  
             bgcolor = F("bgcolor = 'SpringGreen'") ;         
           }
           if ( evalve[k].OffCoilBoardBit == BoardBit ){
-            message += "VA"+String(k+1) ;  
+            message2 += "VA"+String(k+1) ;  
             bgcolor = F("bgcolor = 'Crimson'") ;          
           }
         }
         if ( evalve[k].FeedbackBoardBit == BoardBit ){
-          message += "VF"+String(k+1) ;  
+          message2 += "VF"+String(k+1) ;  
           bgcolor = F("bgcolor = 'Orange'") ;          
         }
       }
       for ( k = 0 ; k < MAX_FERT ; k ++ ) {
         if ( efert[k].BoardBit == BoardBit ) {
-          message += "X"+String(k+1) ;  
+          message2 += "X"+String(k+1) ;  
           bgcolor = F("bgcolor = 'Blue'") ;          
         }
       }
       for ( k = 0 ; k < MAX_FILTER ; k ++ ) {
         for ( kk = 0 ; kk < MAX_CANISTERS ; kk ++ ) {
           if ( efilter[k].BoardBit[kk] == BoardBit ) {
-            message += "F"+String(k+1)+"C"+String(kk+1) ;  
+            message2 += "F"+String(k+1)+"C"+String(kk+1) ;  
             bgcolor = F("bgcolor = 'Magenta'") ;
           }
         }
       }
-      server.sendContent("<td " + bgcolor + ">" + message + "</td>");
+      message += "<td " + bgcolor + ">" + message2 + "</td>";
     }
     
-    server.sendContent(F("</tr>"));
+    message += F("</tr>\r\n");
+    server.sendContent(message);
   }
-  server.sendContent(F("</table><br><table title='Legend'><tr><td>V</td><td bgcolor='Lime'>Single Acting Valve Energise</td></tr>"));
-  server.sendContent(F("<tr><td>VE</td><td bgcolor='SpringGreen'>Double Acting Valve On</td></tr>"));
-  server.sendContent(F("<tr><td>VA</td><td bgcolor='Crimson'>Double Acting Valve Off</td></tr>"));
-  server.sendContent(F("<tr><td>X</td><td bgcolor='Blue'>Fertigation Pump</td></tr>"));
-  server.sendContent(F("<tr><td>F</td><td bgcolor='Magenta'>Filter</td></tr>"));
-  server.sendContent(F("<tr><td>VF</td><td bgcolor='Orange'>Valve FeedBack - Input</td></tr>"));
-  server.sendContent(F("</table>"));
+  message = F("</table><br><table title='Legend'><tr><td>V</td><td bgcolor='Lime'>Single Acting Valve Energise</td></tr>");
+  message += F("<tr><td>VE</td><td bgcolor='SpringGreen'>Double Acting Valve On</td></tr>");
+  message += F("<tr><td>VA</td><td bgcolor='Crimson'>Double Acting Valve Off</td></tr>");
+  message += F("<tr><td>X</td><td bgcolor='Blue'>Fertigation Pump</td></tr>");
+  message += F("<tr><td>F</td><td bgcolor='Magenta'>Filter</td></tr>");
+  message += F("<tr><td>VF</td><td bgcolor='Orange'>Valve FeedBack - Input</td></tr>");
+  message += F("</table>");
+  server.sendContent(message);
+  message = "" ;
   SendHTTPPageFooter();  
 //  server.sendContent(F("<br><a href='/scan'>I2C Scan</a><br><a href='/'>Home</a></body></html>\r\n"));
 }

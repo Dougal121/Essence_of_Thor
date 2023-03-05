@@ -540,6 +540,7 @@ void setup() {
 int i , k , j = 0; 
 float tmpbw = 125.0 ;
 long  bw = 125000 ;
+uint8_t OnPol ;
   
   lRebootCode = random(1,+2147483640) ;  // want to change it straight away
   chipid=ESP.getEfuseMac();         //The chip ID is essentially its MAC address(length: 6 bytes).
@@ -658,6 +659,14 @@ long  bw = 125000 ;
   }
   j = 0 ;
   ZeroFertQue();  
+
+  for (i = 0 ; i < MAX_VALVE ; i++ ) {   // setup the defaults in the 3 volitile structs that support data comin back from eeprom
+    OnPol = ((evalve[i].OnOffPolPulse & 0x80  ) >> 7  ) ;    
+//    Serial.println( String(i) + " OnPol " + String(OnPol));
+    ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , 0 ) ;  // was offpol but not usefull
+    ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , 0 ) ;
+  }
+  
   delay(1000);
 //  Serial.println("Chip ID " + String(chipid, HEX));
 //  Serial.println("Configuring WiFi...");
@@ -884,7 +893,7 @@ int iLoRaReturn = 0 ;
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
     display.drawString(0 , LineText, String(buff) );
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    if (!WiFi.isConnected())  {
+    if (WiFi.isConnected())  {
       display.drawString(127 , LineText, String(WiFi.RSSI()));
     }else{
       display.drawString(127 , LineText, "-X-");
@@ -1104,7 +1113,7 @@ int iLoRaReturn = 0 ;
         board = 0 ;
         if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {
 //          IOEXP[board].write( evalve[i].OffCoilBoardBit , !OnPol );                      // hold off
-          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usfull
+          ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usefull
         }else{
 //          IOEXP[board].pulsepin( evalve[i].OffCoilBoardBit , OffPulse , OffPol );        // Pulse Off 
 //          Serial.println("Off Pulse " + String(OffPulse));
