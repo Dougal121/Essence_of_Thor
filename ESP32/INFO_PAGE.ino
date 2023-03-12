@@ -242,7 +242,16 @@ void handleSetup(){
     if (i != -1){                                    // timesvr
      String(server.arg(j)).toCharArray( ghks.timeServer , sizeof(ghks.timeServer)) ;
     }
-
+    i = String(server.argName(j)).indexOf("atoff");
+    if (i != -1){  // have a request to request a time update
+      tm.Year = (String(server.arg(j)).substring(0,4).toInt()-1970) ;
+      tm.Month =(String(server.arg(j)).substring(5,7).toInt()) ;
+      tm.Day = (String(server.arg(j)).substring(8,10).toInt()) ;
+      tm.Hour =(String(server.arg(j)).substring(11,13).toInt()) ;
+      tm.Minute = (String(server.arg(j)).substring(14,16).toInt()) ;
+      tm.Second = 0 ;
+      ghks.AutoOff_t = makeTime(tm);
+    }  
     
   }
   
