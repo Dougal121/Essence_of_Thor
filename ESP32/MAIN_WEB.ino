@@ -227,6 +227,13 @@ void handleRoot() {
         evalve[ii].TypeMaster = 0x3f & String(server.arg(j)).toInt()   ;
 //        Serial.println("TypeMaster C " + String(evalve[ii].TypeMaster) );  
       }        
+      i = String(server.argName(j)).indexOf("vtya" + MyNum);
+      if (i != -1){  // valve type / always on ? 
+        if ( String(server.arg(j)).length() == 2 ){ // only put back what we find
+          evalve[ii].TypeMaster |= ( 0x200 )  ;
+//          Serial.println("TypeMaster AO " + String(evalve[ii].TypeMaster) );  
+        }
+      }                      
       i = String(server.argName(j)).indexOf("vtyd" + MyNum);
       if (i != -1){  // valve type / domestic ? 
         if ( String(server.arg(j)).length() == 2 ){ // only put back what we find

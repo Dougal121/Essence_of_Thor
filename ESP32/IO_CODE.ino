@@ -402,6 +402,7 @@ void ioScan() {
     
     message += F("</tr>\r\n");
     server.sendContent(message);
+    message = "" ;
   }
   message = F("</table><br><table title='Legend'><tr><td>V</td><td bgcolor='Lime'>Single Acting Valve Energise</td></tr>");
   message += F("<tr><td>VE</td><td bgcolor='SpringGreen'>Double Acting Valve On</td></tr>");
