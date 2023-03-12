@@ -6,7 +6,7 @@ void handleInfo(){
   String MyColor ;
   String MyColor2 ;
   byte mac[6];
- 
+
 
   SerialOutParams();
   
@@ -72,6 +72,7 @@ void handleSetup(){
   byte mac[6];
   String strSelected = "";
   String strOption = "" ; 
+   tmElements_t tm;
 
 //  SerialOutParams();
   

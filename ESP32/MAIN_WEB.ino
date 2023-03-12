@@ -115,7 +115,6 @@ void handleRoot() {
   String MyCheck , MyColor , MyNum , MyCheck2 , MyCheck3 ;
   byte mac[6];
   String message ;
-  tmElements_t tm;
 
 //  SerialOutParams();
   
