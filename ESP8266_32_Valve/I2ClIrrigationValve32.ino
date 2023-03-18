@@ -80,8 +80,8 @@ const byte MAX_WEEKS = 53 ;
 const byte MAX_FERT_LOGS = 24 ;
 const byte MAX_CNC = 16 ;
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
-SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-//SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
+//SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
+SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
 
 
 /*
