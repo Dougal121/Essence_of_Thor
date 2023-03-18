@@ -98,7 +98,7 @@ const int MAX_EEPROM = 4000 ;
 const byte MAX_WIFI_TRIES = 45 ;
 const int PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
 const int PROG_BASE_NEW = 320 ;   // where the irrigation valve setup and program information starts in eeprom
-const byte MAX_VALVE =  16 ;   // these two easily changed just watch the memory 
+const byte MAX_VALVE =  32 ;   // these two easily changed just watch the memory 
 const byte MAX_REM_LIST = 16 ; // number of remote nodes to monitor
 const byte MAX_PROGRAM = 4 ;   // valves * program is the biggest memory number ... can do 32 x 4 OK but need to allocate more EEPROM
 const byte MAX_FERT = 6 ;      // fertigation units MAXIUM of 8 <- DEAL & CODE BREAKER
@@ -115,6 +115,8 @@ const byte MAX_MONTHS = 12 ;
 const byte MAX_WEEKS = 53 ;
 const byte MAX_FERT_LOGS = 24 ;
 const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a system
+const byte MAX_CNC = 16 ;
+
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
 SSD1306 display(0x3c, 4 ,15 );   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
 //SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
@@ -170,8 +172,11 @@ typedef struct __attribute__((__packed__)) {            // volitile stuff
   int16_t lTTG   ;          // minutes  
   int16_t lTTC ;            // time to clear the line after pump has last activated (seconds -- counts down)    
   bool    bNetOnOff ;       // network on off status
-  double  dblMoisture ;     // current moisture level  
-} valve__t ;                // 8 bytes   
+  float   dblMoisture ;     // current moisture level at probe
+  float   dblTemp ;         // current soil temperature at probe  
+  float   dblDepth ;         // current soil temperature at probe  
+  time_t  mpTime ;          // last time moisture level  
+} valve__t ;                // 21 bytes ish   
 
 typedef struct __attribute__((__packed__)) {            // permanent record
   uint8_t AType ;           // top 4 bits 1 normal pump , 2 master pump , 3 chemical solenoid , 4 wash solenoid  --- bottom 3 bits master pump record if solenoide
@@ -245,7 +250,7 @@ typedef struct __attribute__((__packed__)) {           //  new programming syste
 
 typedef struct __attribute__((__packed__)) {           // 
   uint8_t   Program ;                                  // 5 bit Shift No - 3 Bits Program No number (8 programs 32 shifts in each)
-  uint16_t  ValveNo ;                                  // one bit for every valve  ?
+  uint32_t  ValveNo ;                                  // one bit for every valve  ?
   int16_t   RunTime ;                                  // runtime in minutes
 } shift_new_t ;                                        // 4 bytes by say 32 or 64 ???  5 if uint16_t --- 7 if uint32_t
 
@@ -263,7 +268,7 @@ fertigation_t     efert[MAX_FERT] ;
 filter_t          efilter[MAX_FILTER] ;  // eprom backed up stuff 
 valve__t          vvalve[MAX_VALVE] ;    // volitile valve stuff
 fertigation__t    vfert[MAX_FERT] ;      // volitile fertigation stuff
-filter__t         vfilter[MAX_FILTER] ;  // volitile valve stuff
+filter__t         vfilter[MAX_FILTER] ;  // volitile filter stuff
 local_t           elocal ;
 valve_totals_t    rtcVT[MAX_VALVE];      // to be read / stored in RTC board eeprom
 valve_totals_t    rtcTest;               // compare so we dont write the whole thing...  
@@ -360,9 +365,28 @@ typedef struct __attribute__((__packed__)) {
   time_t       mc ;              // master clock
   uint8_t      snode ;           // source node
   uint8_t      valves ;          // number to follow
-  cnc_v_t      cv[16] ;          // the most that we can have   16 x 14 = 224
-  uint16_t     crc ;
+  cnc_v_t      cv[MAX_CNC] ;          // the most that we can have   16 x 14 = 224
+  uint16_t     crc  ;
 } cnc_t ;                        // 234 bytes
+
+typedef struct __attribute__((__packed__)) {
+  uint8_t      ValveNo ;
+  uint8_t      Node ;
+  uint8_t      Spare ;
+  uint8_t      Depth ;
+  float        Temp ;
+  float        Wet ;          // % wetness ??
+} wet_v_t ;                   // 12 bytes
+
+typedef struct __attribute__((__packed__)) {
+  uint8_t      cmd ;             // 43 for moisture monitor
+  uint8_t      spare ;
+  time_t       mc ;              // slave clock
+  uint8_t      snode ;           // source node
+  uint8_t      valves ;          // number to follow
+  wet_v_t      mp[MAX_CNC] ;     // the most that we can have   16 x 12 = 192
+  uint16_t     crc ;
+} wet_t ;                        // 4 + 4 + 192 + 2 = 202 ?
 
 typedef struct __attribute__((__packed__)) {
   uint8_t      cmd ;
@@ -594,6 +618,10 @@ uint8_t OnPol ;
     vvalve[i].lATTG = 0 ;
     vvalve[i].lTTG = 0 ;
     vvalve[i].bOnOff = false ;
+    vvalve[i].dblMoisture = 0.0 ;     // current moisture level at probe
+    vvalve[i].dblTemp = 0.0 ;         // current soil temperature at probe  
+    vvalve[i].dblDepth = 0.0 ;         // current soil temperature at probe  
+    vvalve[i].mpTime = 0  ;          // last time moisture level      
   }
 
   for (i = 0 ; i < MAX_FERT ; i++ ) {

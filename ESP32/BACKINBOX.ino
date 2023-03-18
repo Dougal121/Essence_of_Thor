@@ -12,7 +12,7 @@ void BackInTheBoxMemory(void){
   
   ghks.lProgMethod = 1 ;
   ghks.cpufreq = 240 ;
-  ghks.displaytimer = 60 ;
+  ghks.displaytimer = 0 ;
   ghks.magsens = 128 ;
   
   
@@ -168,10 +168,10 @@ void BackInTheBoxMemory(void){
   ghks.RemotePortCtrl= 8089 ;
   ghks.lVersion = MYVER ;
   
-  ghks.RCIP[0] = 192 ;
-  ghks.RCIP[1] = 168 ; 
-  ghks.RCIP[2] = 2 ;
-  ghks.RCIP[3] = 255 ;
+  ghks.RCIP[0] = 0 ;
+  ghks.RCIP[1] = 0 ; 
+  ghks.RCIP[2] = 0 ;
+  ghks.RCIP[3] = 1 ;
   
   ghks.lNetworkOptions = 0 ;     // DHCP 
   ghks.IPStatic[0] = 192 ;
@@ -202,28 +202,28 @@ void BackInTheBoxMemory(void){
         elocal.IOPin[i] = 13 ;
       break;
       case 2:
-        elocal.IOPin[i] = 17 ;
+        elocal.IOPin[i] = 2 ;
       break;
       case 3:
-        elocal.IOPin[i] = 23 ;
+        elocal.IOPin[i] = 17 ;
       break;
       case 4:
-        elocal.IOPin[i] = 25 ;
+        elocal.IOPin[i] = 23 ;
       break;
       case 5:
-        elocal.IOPin[i] = 34 ;
+        elocal.IOPin[i] = 25 ;
       break;
       case 7:
-        elocal.IOPin[i] = 35 ;
+        elocal.IOPin[i] = 34 ;
       break;
       case 8:
-        elocal.IOPin[i] = 36 ;
+        elocal.IOPin[i] = 35 ;
       break;
       case 9:
-        elocal.IOPin[i] = 39 ;
+        elocal.IOPin[i] = 36 ;
       break;
       case 10:
-        elocal.IOPin[i] = 2 ;
+        elocal.IOPin[i] = 39 ;
       break;
     } 
     
@@ -239,7 +239,8 @@ void BackInTheBoxMemory(void){
     }
 #endif           
   }
-  ResetADCCalInfo;
+  ResetADCCalInfo();
+  ResetSMTPInfo();
 }
 
 void LoadParamsFromEEPROM(bool bLoad){

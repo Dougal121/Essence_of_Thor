@@ -187,6 +187,17 @@ void handleRoot() {
           ii = SaveCurrentQty(false);
 //          Serial.println(String(ii) + " Fert records updated");
         break;
+        case 669:
+          for ( ii = 0 ; ii < ghks.lMaxDisplayValve ; ii++){  // toggle them all on or off 
+            if ((evalve[ii].Valve & 0x80 ) == 0 ) {
+              evalve[ii].Valve |= 0x80  ;           
+            }else{
+              evalve[ii].Valve &= ( 0x7F )  ;                           
+            }
+          }
+          bExtraValve = true ;  // makes the option active
+          iPage = 1 ;
+        break;
       }  
     }
     i = String(server.argName(j)).indexOf("reboot");
@@ -528,7 +539,9 @@ void handleRoot() {
       if (iPage == 1 ){
         message += F("<th rowspan=2>Description</th>") ; 
         message += F("<th colspan=5>Control Options</th><th colspan=3>Remote</th><th>Flow</th><th colspan=4>On</th><th colspan=4>Off</th></tr>");      
-        message += F("<tr><th>Cascade</th><th title='Always On'>AO</th><th title='Domestic Water'>DW</th><th title='Master Valve'>MV</th><th title='Feed Back'>FB</th><th title='Send to Valve'>Valve</th><th title='Accept Uplink'>Rx</th><th title='Send to Node ID'>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th></tr>") ; 
+        message += F("<tr><th>Cascade</th><th title='Always On'>AO</th><th title='Domestic Water'>DW</th><th title='Master Valve'>MV</th><th title='Feed Back'>FB</th><th title='Send to Valve'>Valve</th><th title='Accept Uplink'>");
+        message += "<form method=post action=" + server.uri() + ">";
+        message += F("<input type='hidden' name='command' value='669'><input type='submit' value='Rx'></form></th><th title='Send to Node ID'>Node</th><th>(l/s)</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th><th>Rly</th><th>Brd</th><th>Pol</th><th>Pulse</th></tr>") ; 
       }else{
         message += F("<th colspan=2>Feed Back</th><th colspan=");              
         message += String(MAX_FERT)+">Fertigate</th><th colspan="+String(MAX_FILTER)+">Filter</th></tr>" ;

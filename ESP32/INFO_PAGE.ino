@@ -77,6 +77,16 @@ void handleSetup(){
 //  SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 2: // Save values
+          LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
+//          Serial.println("Save to EEPROM");
+        break;
+      }
+    }
 
     i = String(server.argName(j)).indexOf("command");
     if (i != -1){  // 
@@ -366,7 +376,7 @@ void handleSetup(){
   message += "<input type='text' name='timsv' value='" + String(ghks.timeServer) + "' maxlength=23 size=12></td><td></td></tr>\r\n";
 
   snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", ghks.RCIP[0],ghks.RCIP[1],ghks.RCIP[2],ghks.RCIP[3]);
-  message += F("<tr><td>Remote IP Address Control</td><td align=center>") ; 
+  message += F("<tr><td>Remote IP Address Control</td><td align=center title='0.0.0.1 client wifi  0.0.0.2 SoftaAP  0.0.0.0 disable  x.x.x.x actual IP  x.x.x.255 broadcast'> ") ; 
   message += "<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr></form>";
   server.sendContent(message) ;
   message = "" ;
