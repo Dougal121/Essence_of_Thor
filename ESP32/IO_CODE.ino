@@ -238,6 +238,7 @@ void ioScan() {
   String message ;  
   String message2 ;  
   String bgcolor ;  
+  uint8_t  error ;      
 /*
   message = "Web Request URI: ";
   message += server.uri();
@@ -286,8 +287,18 @@ void ioScan() {
   message = "" ;
   
   for (i = 0; i < MAX_BOARDS ; i++) {                             // for each board
-    message += F("<tr>");
-    message += "<tr><form method=get action=" + server.uri() + "><td>"+String(i)+"</td><td><select name='a"+String(i)+"'>";
+    server.sendContent(F("<tr>"));
+    bgcolor = "title='Device not found'" ;
+    Wire.beginTransmission(eboard[i].Address);
+    error = Wire.endTransmission();
+    if ( error == 0 ){
+      bgcolor = F("bgcolor = 'Lime' title='Device On Line'") ;
+    }else{
+      if (error == 4){
+        bgcolor = F("bgcolor = 'Red' title='Device Faulted'") ;      
+      }
+    }
+    server.sendContent("<tr><form method=get action=" + server.uri() + "><td "+bgcolor+">"+String(i)+"</td><td><select name='a"+String(i)+"'>");
     switch (eboard[i].Type){
       case 0:
         for (ii = 0; ii < 8; ii++) {

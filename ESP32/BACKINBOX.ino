@@ -155,6 +155,7 @@ void BackInTheBoxMemory(void){
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
   
 
+  sprintf(ghks.NodeName,"Prickle Patch\0") ;
 
   sprintf(ghks.cpassword,"\0");
   
@@ -171,7 +172,7 @@ void BackInTheBoxMemory(void){
   ghks.RCIP[0] = 0 ;
   ghks.RCIP[1] = 0 ; 
   ghks.RCIP[2] = 0 ;
-  ghks.RCIP[3] = 1 ;
+  ghks.RCIP[3] = 1 ;  //  0 disables    1 local client net   2 SoftAP net   x.x.x.x  actual address  x.x.x.255 broadcast
   
   ghks.lNetworkOptions = 0 ;     // DHCP 
   ghks.IPStatic[0] = 192 ;

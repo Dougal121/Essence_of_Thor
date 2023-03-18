@@ -133,6 +133,12 @@ void handleRoot() {
     i = String(server.argName(j)).indexOf("command");
     if (i != -1){  // 
       switch (String(server.arg(j)).toInt()){
+        case 0: // all stop
+          for ( ii = 0 ; ii < ghks.lMaxDisplayValve ; ii++){         // handle all the valve control commands for any and all valves
+            vvalve[ii].bOnOff = true ;                               // turn on to ensure a pulse is generated 
+            vvalve[ii].lTTG = 0 ;                                    // reset this to zero 
+          }          
+        break;        
         case 1:  // load values
           LoadParamsFromEEPROM(true);
 //          Serial.println("Load from EEPROM");
@@ -555,7 +561,24 @@ void handleRoot() {
       }
       message += F("</tr>") ;
     }else{                           // second heading row
-      message += F("<th rowspan=2 colspan=2>State</th><th rowspan=2>Enable</th><th rowspan=2>ATTG</th><th rowspan=2>MTTG</th><th rowspan=2>DTTG</th></tr><tr></tr>") ;
+      MyColor = "";
+      if ( strBusResults.length() != 0 ){
+        MyColor += "I2C";
+      }
+      if ( bLoRa ){
+        if ( !bLoRaGood ){
+          if ( MyColor.length() > 0 ) {
+            MyColor += "<br>" ;
+          }
+          MyColor += "LoRa";
+        }
+      }
+      if ( MyColor.length() > 0 ) {
+        MyColor = "<b><font color='red'>" + MyColor + "</font></b>" ;
+      }
+      message += F("<th rowspan=2 colspan=2>State</th><th rowspan=2>Enable</th><th rowspan=2>ATTG</th><th rowspan=2>MTTG</th><th rowspan=2>DTTG</th><th title='fault conditions'>") ;
+      message += MyColor ;
+      message += F("</th></tr><tr></tr>\r\n") ;
     }
     for ( i = 0 ; i < ghks.lMaxDisplayValve ; i++){       // MAX_VALVE
       MyNum = String(i) ;
@@ -676,11 +699,14 @@ void handleRoot() {
           }          
         }
       }
-      message += F("<td><input type='submit' value='SET'></td></form></tr>") ;
+      message += F("<td><input type='submit' value='SET'></td></form></tr>\r\n") ;
       server.sendContent(message) ;
       message = "" ;
     }
-    message += F("</table>");
+    if ( !bExtraValve ){
+      message += "<tr><form method=post action=" + server.uri() + "><td colspan=8 align=center><input type='hidden' name='command' value='0'><input type='submit' value='### MANUAL ALL OFF ###'></td></form></tr>\r\n" ;
+    }    
+    message += F("</table>\r\n");
     server.sendContent(message) ;
   }
 

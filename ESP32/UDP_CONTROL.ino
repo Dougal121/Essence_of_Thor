@@ -233,6 +233,7 @@ uint16_t     crc ;
                 i = MAX_REM_LIST ;                                  // exit as we have found the target  
               }
             }
+            LoRaCheck();
           }
         }
         else{
