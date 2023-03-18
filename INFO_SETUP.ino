@@ -86,6 +86,17 @@ void handleSetup(){
 //  SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
+
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 2: // Save values
+          LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
+//          Serial.println("Save to EEPROM");
+        break;
+      }
+    }
 //    bSaveReq = 1 ;
     i = String(server.argName(j)).indexOf("prgm");
     if (i != -1){  // look at the program number else it stays zero
@@ -106,6 +117,7 @@ void handleSetup(){
         break;
         case 2: // Save values
           LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
 //          Serial.println("Save to EEPROM");
         break;
 
@@ -341,7 +353,7 @@ void handleSetup(){
   if ( bSaveReq != 0 ){
     server.sendContent(F("<blink>"));      
   }   
-  server.sendContent(F("<a href='/?command=2'>Save Parameters to EEPROM</a><br>")) ;     
+  server.sendContent(F("<a href='/setup/?command=2'>Save Parameters to EEPROM</a><br>")) ;     
   if ( bSaveReq != 0 ){
     server.sendContent(F("</blink><font color='red'><b>Changes Have been made to settings.<br>Make sure you save if you want to keep them</b><br></font><br>")) ;     
   }
