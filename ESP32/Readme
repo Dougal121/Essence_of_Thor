@@ -1,4 +1,0 @@
-The ESP32 version is born
-
-26/02/2023   LoRa First cut working using TTGO boards
-05/03/2023   LoRa working but dissappointing range (200m ish) adding more radio "stuff" to experiment with
