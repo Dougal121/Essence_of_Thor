@@ -1,7 +1,21 @@
-void BackInTheBoxMemory(){
+void ResetLoRaParams(void){
+  ghks.iFreq = 9150 ;
+  ghks.iBandWidth = 7 ;
+  ghks.iSpread = 7 ;
+  ghks.iTXPower = 17 ;
+}
+
+void BackInTheBoxMemory(void){
   uint8_t i , j ;
 
+  ResetLoRaParams();
+  
   ghks.lProgMethod = 1 ;
+  ghks.cpufreq = 240 ;
+  ghks.displaytimer = 0 ;
+  ghks.magsens = 128 ;
+  
+  
   for (i = 0 ; i < MAX_SHIFTS  ; i++ ) {   // NEW PROGRAMMING   ------   Clear all these
     pn.sh[i].Program = 0 ;
     if ( i == 0 ){
@@ -13,7 +27,7 @@ void BackInTheBoxMemory(){
     }
   }  
   for (i = 0 ; i < MAX_PROGRAM_HEADER  ; i++ ) {   // Clear all these
-    sprintf(pn.ph[i].Description , "Prog %2d\0" ,(i+1) ) ;
+    sprintf(pn.ph[i].Description , "Prog %2d\0" ,i ) ;
     pn.ph[i].WDays = 0 ;
     for (j = 0 ; j < MAX_STARTS  ; j++ ) {   // NEW PROGRAMMING    ------   Clear all these
       if (( j == 0 ) && ( i == 0 )) {
@@ -61,13 +75,13 @@ void BackInTheBoxMemory(){
       evalve[i].OnCoilBoardBit = 0x10 + ((i-8) * 2 ) ;
       evalve[i].OffCoilBoardBit = 0x10 + ((i-8) * 2 + 1 ) ;                
     }
-    evalve[i].OnOffPolPulse = 0x11 ; // 20ms
     evalve[i].Fertigate = 0 ;
     evalve[i].bEnable = true ;
     evalve[i].Flowrate = 1.0 ;
    
     evalve[i].FeedbackBoardBit = 0xa0 + i ;  // board 10
-
+    evalve[i].OnOffPolPulse = 0x44 ;
+    
     evalve[i].Filter = 0 ;
     evalve[i].Node = 0 ;
     evalve[i].Valve = 0 ;
@@ -83,7 +97,7 @@ void BackInTheBoxMemory(){
     efert[i].PumpRate = 0.1 ;
 //    if ( i < 2 ){
       efert[i].DaysEnable = 0xff ;
-      efert[i].BoardBit = 0x20 + i ;  // board 2
+      efert[i].BoardBit = 0x90 + i ;  // board 2
       efert[i].OffTime = 15 ;  
 /*    }else{
       efert[i].DaysEnable = 0x0 ;
@@ -97,7 +111,7 @@ void BackInTheBoxMemory(){
     efilter[i].Canisters = 3 ;    
     efilter[i].bPol = 0xff ;
     for ( j = 0 ; j < MAX_CANISTERS ; j++){
-       efilter[i].BoardBit[j] = 0x70 + j ; // board 7 plus the offset for the bit
+       efilter[i].BoardBit[j] = 0x80 + j ; // board 7 plus the offset for the bit
     }
     efilter[i].WashTime = 180 ;
     efilter[i].WashDelay = 3600 ;
@@ -136,40 +150,35 @@ void BackInTheBoxMemory(){
     if ( i == 0x0c ){
       eboard[i].Type = 3 ;  // none as display is present at 0x3C
     }
+    if ( i == 0x0f ){
+      eboard[i].Type = 2 ;  // Configure Local IO
+    }
   }
   sprintf(ghks.nssid,"************\0");  // put your default credentials in here if you wish
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
+  
 
-  sprintf(ghks.NodeName,"GlaDOS\0") ;
+  sprintf(ghks.NodeName,"Prickle Patch\0") ;
 
   sprintf(ghks.cpassword,"\0");
   
   ghks.fTimeZone = 10.0 ;
-  ghks.lNodeAddress = ESP.getChipId() & 0xff ;
+  ghks.lNodeAddress = chipid & 0xff ;
   ghks.lPulseTime = 20 ;
   ghks.lMaxDisplayValve = MAX_VALVE ;
   sprintf(ghks.timeServer ,"au.pool.ntp.org\0"); 
   ghks.AutoOff_t = 0 ;
   ghks.localPortCtrl = 8088 ;
-  ghks.RemotePortCtrl= 8088 ;
+  ghks.RemotePortCtrl= 8089 ;
   ghks.lVersion = MYVER ;
 
-  ghks.ADC_Cal_Ofs = 0.0 ;
-  ghks.ADC_Cal_Mul = 1.0 ;
-  ghks.SelfReBoot = 0 ;
-  ghks.lRebootTimeDay = 0 ;
-  sprintf(ghks.ADC_Unit , "\0") ;      // units for display
-  ghks.ADC_Alarm_Mode = 0 ;               // high low etc
-  ghks.ADC_Alarm1 = 0 ;
-  ghks.ADC_Alarm2 = 0 ;                   // 
-  ghks.ADC_Alarm_Delay = 60 ;             // trigger to alarm in seconds  
+  ghks.SolPulsePower = 0 ;
+  ghks.SolContPower = 0 ;
   
-/*  ghks.RCIP[0] = 192 ;
-  ghks.RCIP[1] = 168 ; 
-  ghks.RCIP[2] = 2 ;
-  ghks.RCIP[3] = 255 ;*/
-  sprintf(ghks.RCIP ,"192.168.2.255\0"); 
-  sprintf(ghks.servername,"\0");
+  ghks.RCIP[0] = 0 ;
+  ghks.RCIP[1] = 0 ; 
+  ghks.RCIP[2] = 0 ;
+  ghks.RCIP[3] = 1 ;  //  0 disables    1 local client net   2 SoftAP net   x.x.x.x  actual address  x.x.x.255 broadcast
   
   ghks.lNetworkOptions = 0 ;     // DHCP 
   ghks.IPStatic[0] = 192 ;
@@ -188,8 +197,44 @@ void BackInTheBoxMemory(){
   ghks.IPMask[1] = 255 ;
   ghks.IPMask[2] = 255 ;
   ghks.IPMask[3] = 0 ;
-
-  for ( i = 0 ; i < 16 ; i++ ) {
+  
+  for ( i = 0 ; i < MAX_LOCAL_IO ; i++ ) {
+    elocal.IOPin[i] = -1 ; // set to nothing 
+#if defined(ESP32)    
+    switch (i){
+      case 0:
+        elocal.IOPin[i] = 12 ;
+      break;  
+      case 1:
+        elocal.IOPin[i] = 13 ;
+      break;
+      case 2:
+        elocal.IOPin[i] = 2 ;
+      break;
+      case 3:
+        elocal.IOPin[i] = 17 ;
+      break;
+      case 4:
+        elocal.IOPin[i] = 23 ;
+      break;
+      case 5:
+        elocal.IOPin[i] = 25 ;
+      break;
+      case 7:
+        elocal.IOPin[i] = 34 ;
+      break;
+      case 8:
+        elocal.IOPin[i] = 35 ;
+      break;
+      case 9:
+        elocal.IOPin[i] = 36 ;
+      break;
+      case 10:
+        elocal.IOPin[i] = 39 ;
+      break;
+    } 
+    
+#elif defined(ESP8266)    
     if (( i > 5 ) && ( i < 12 )){
       if ( i == 6 ) {
         elocal.IOPin[i] = 16 ;   // map out the memory bus pins by default            
@@ -199,12 +244,11 @@ void BackInTheBoxMemory(){
     }else{
       elocal.IOPin[i] = i ; 
     }
+#endif           
   }
-  ZeroValveLogsMemory(15);
+  ResetADCCalInfo();
   ResetSMTPInfo();
 }
-
-
 
 void LoadParamsFromEEPROM(bool bLoad){
 long lTmp ;  
@@ -218,20 +262,26 @@ int eeAddress ;
     eeAddress = sizeof(ghks) ;
     Serial.println("read - ghks structure size " +String(eeAddress));   
 
-    ghks.lPulseTime = constrain(ghks.lPulseTime,10,1000);
     ghks.lNodeAddress = constrain(ghks.lNodeAddress,0,32768);
     ghks.fTimeZone = constrain(ghks.fTimeZone,-12,12);
     ghks.localPort = constrain(ghks.localPort,1,65535);
     ghks.localPortCtrl = constrain(ghks.localPortCtrl,1,65535);
     ghks.RemotePortCtrl = constrain(ghks.RemotePortCtrl,1,65535);
-    if ( ghks.SelfReBoot < 0 )
-      ghks.SelfReBoot = 0 ;
-      
+    if ( ghks.iBandWidth > 9 ){
+      ghks.iBandWidth = 9 ;
+    }
+    ghks.iBandWidth = constrain(ghks.iBandWidth,0,9);   
+    ghks.iFreq = constrain(ghks.iFreq,9150,9285);
+    ghks.lPulseTime = constrain(ghks.lPulseTime,10,255);
+    
     if ( year(ghks.AutoOff_t) < 2000 ){
        ghks.AutoOff_t = now();
     }
     ghks.lProgMethod = constrain(ghks.lProgMethod,0,1);
-    ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,1);
+    ghks.iSpread = constrain(ghks.iSpread,5,12);
+    ghks.iTXPower = constrain(ghks.iTXPower,2,20);
+    
+    ghks.lDisplayOptions = constrain(ghks.lDisplayOptions,0,255);
     if ( ghks.lMaxDisplayValve <= 0 ){
       ghks.lMaxDisplayValve = MAX_VALVE ;
     }
@@ -248,6 +298,9 @@ int eeAddress ;
     if ( isnan(ghks.ADC_Cal_Mul) || isinf(ghks.ADC_Cal_Mul) ){
       ghks.ADC_Cal_Mul = 1.0 ;
     }
+    ghks.ADC_Input_PIN1 = constrain(ghks.ADC_Input_PIN1,-1,MaxPinPort);       // 
+    ghks.ADC_Input_PIN2 = constrain(ghks.ADC_Input_PIN2,-1,MaxPinPort);       //
+
     EEPROM.get(eeAddress,evalve);
     eeAddress += sizeof(evalve) ;
     EEPROM.get(eeAddress,vp);
@@ -265,12 +318,13 @@ int eeAddress ;
     eeAddress += sizeof(pn) ;
     EEPROM.get(eeAddress,SMTP);
     eeAddress += sizeof(SMTP) ;
-
+    EEPROM.get(eeAddress,adcs);
+    eeAddress += sizeof(adcs) ;
     
     Serial.println("Final VPFF EEPROM adress " +String(eeAddress));   
     
   }else{
-    ghks.lVersion  = MYVER_NEW ;
+    ghks.lVersion  =  MYVER_NEW ;
     EEPROM.put(0,ghks);
     eeAddress = sizeof(ghks) ;
     Serial.println("write - ghks structure size " +String(eeAddress));   
@@ -292,6 +346,8 @@ int eeAddress ;
     eeAddress += sizeof(pn) ;
     EEPROM.put(eeAddress,SMTP);
     eeAddress += sizeof(SMTP) ;
+    EEPROM.put(eeAddress,adcs);
+    eeAddress += sizeof(adcs) ;
     
     Serial.println("Final EEPROM Save adress " +String(eeAddress));   
 
@@ -299,5 +355,4 @@ int eeAddress ;
     bSaveReq = 0 ;
   }
 }
-
 
