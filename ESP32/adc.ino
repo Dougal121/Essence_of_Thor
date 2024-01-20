@@ -211,7 +211,7 @@ void adcLocalMap() {
 
 void ResetADCCalInfo(){
   int i ,j ; 
-  sprintf(ghks.ADC_Unit,"kPa\0") ;
+/*  sprintf(ghks.ADC_Unit,"kPa\0") ;
   ghks.ADC_Cal_Ofs = -170.0 ;
   ghks.ADC_Cal_Mul = 640.0 ;
   ghks.ADC_Alarm_Mode = 0 ;               // high low etc
@@ -219,7 +219,7 @@ void ResetADCCalInfo(){
   ghks.ADC_Alarm2 = 0 ;                   // 
   ghks.ADC_Input_PIN1 = 25 ;
   ghks.ADC_Input_PIN2 = 26 ;  
-  ghks.ADC_Alarm_Delay = 60 ; 
+  ghks.ADC_Alarm_Delay = 60 ; */
 
   for ( j=0; j<ADC_MAX_ALARM; j++){
     adcs.alarm[j].ADC_Channel = j / (ADC_MAX_ALARM / ADC_MAX_CHAN) ;
@@ -236,10 +236,10 @@ void ResetADCCalInfo(){
     sprintf(adcs.chan[i].ADC_Unit , "kPa\0") ;      // units for display
     switch(i){
       case 0:
-        adcs.chan[i].ADC_Input_PIN = 2 ;
+        adcs.chan[i].ADC_Input_PIN = 12 ;
       break;
       case 1:
-        adcs.chan[i].ADC_Input_PIN = 4 ;
+        adcs.chan[i].ADC_Input_PIN = 13 ;
       break;
       case 2:
         adcs.chan[i].ADC_Input_PIN = 35 ;

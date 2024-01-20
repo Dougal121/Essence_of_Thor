@@ -169,7 +169,7 @@ void handleSetup(){
     i = String(server.argName(j)).indexOf("dotmr");
     if (i != -1){  // 
       ghks.displaytimer = String(server.arg(j)).toInt() ;
-      ghks.displaytimer = constrain(ghks.displaytimer,0,255);
+      ghks.displaytimer = constrain(ghks.displaytimer,-1,255);
     }  
     
     i = String(server.argName(j)).indexOf("prgop");
@@ -347,6 +347,7 @@ void handleSetup(){
   }
   
   SendHTTPHeader();
+  server.sendContent(F("<a href='/setup?command=2'>Save Parameters to EEPROM</a><br>")) ;     
 
   message += "<form method=post action=" + server.uri() + "><table border=1 title='Node Settings'>";
   message += F("<tr><th>Parameter</th><th>Value</th><th><input type='submit' value='SET'></th></tr>\r\n");
@@ -481,7 +482,7 @@ void handleSetup(){
   message += F("</select></td><td></td></tr>\r\n");
 
   message += F("<tr><td>Turn Wifi and Display off after</td><td align=center>") ; 
-  message += "<input type='text' name='dotmr' value='" + String(ghks.displaytimer) + "' size=4 maxlength=3></td><td>(min) 0 - disables</td></tr>\r\n";
+  message += "<input type='text' name='dotmr' value='" + String(ghks.displaytimer) + "' size=4 maxlength=3></td><td>(min) (-1) - disables</td></tr>\r\n";
 
   message += F("<tr><td>Mag Switch Level</td><td align=center>") ; 
   message += "<input type='text' name='magsn' value='" + String(ghks.magsens) + "' size=4 maxlength=5></td><td>(?)</td></tr>\r\n";
@@ -529,6 +530,7 @@ void handleSetup(){
   message += F("<tr><td>Remote IP Address Control</td><td align=center title='0.0.0.1 client wifi  0.0.0.2 SoftaAP  0.0.0.0 disable  x.x.x.x actual IP  x.x.x.255 broadcast'> ") ; 
   message += "<input type='text' name='rpcip' value='" + String(buff) + "' maxlength=16 size=12></td><td></td></tr></form>";
   server.sendContent(message) ;
+  message = "" ;
   message += F("<tr><td colspan=3></td></tr>\r\n") ;
 
   message += "<tr><td><b>LoRa Stuff</b></td><td><form method=post action=" + server.uri() + "><input type='hidden' name='command' value='369'><input type='submit' value='Reset LoRa Parameters'></form></td><td><form method=post action=" + server.uri() + "><input type='submit' value='SET'></td></tr>\r\n" ; 

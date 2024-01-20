@@ -486,6 +486,12 @@ String strPINName(int iPin,int *iTmp,int iPinType)
       switch(iPin){
         case 2: pinname = F("GPIO 2 ADC") ; break;
         case 4: pinname = F("GPIO 4 ADC") ; break;
+        case 12: pinname = F("GPIO 12 ADC*") ; break;
+        case 13: pinname = F("GPIO 13 ADC*") ; break;
+        case 14: pinname = F("GPIO 14 ADC*") ; break;
+        case 25: pinname = F("GPIO 25 ADC*") ; break;
+        case 26: pinname = F("GPIO 26 ADC*") ; break;
+        case 27: pinname = F("GPIO 27 ADC*") ; break;
         case 34: pinname = F("GPIO 34 ADC") ; break;
         case 35: pinname = F("GPIO 35 ADC") ; break;
         case 36: pinname = F("GPIO 36 ADC") ; break;

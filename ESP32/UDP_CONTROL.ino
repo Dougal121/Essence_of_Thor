@@ -5,7 +5,7 @@ IPAddress ctrlIP ;
 cnc_t  cnc ;  
 String strDestIP ;
 
-  Serial.println("CTRL packet called...");
+  Serial.println("send CTRL packet called...");
 
 //    Serial.println("WiFi Available...");
                       
@@ -79,11 +79,95 @@ byte packetBuffer[16];
 unsigned long timediff ;
 cnc_t  cnc ;  
 wet_t  cmp ;
+program_new_t cpn;
+//ssu_t icd ; // incoming data ( the structure is the union superset of the max bytes it can be)
+drq_t drq;
 uint16_t  crc ;
 String strDestIP ;
 IPAddress ReturnIP ;
 
-  Serial.println("Process Uplinked WiFi data " + String(lSize) + " bytes");  
+  Serial.println("Process UDP data via WiFi " + String(lSize) + " bytes");  
+  if ( lSize == sizeof(drq) ){    
+    memset(&drq, 0, sizeof(drq));
+    ctrludp.read((byte *)&drq, sizeof(drq));                               // read the packet into the buffer
+    crc = calculateCRC16(&drq,sizeof(drq)-2);     
+    if (crc == drq.crc){                                                   // ensure valid command and packet crc
+        Serial.println("UDP Request to Uplink data " + String(drq.crc) + " accepted");              
+        snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ReturnIP[0], ReturnIP[1], ReturnIP[2], ReturnIP[3]);    // return the acknologe to the sender      
+        ctrludp.beginPacket( buff, ghks.RemotePortCtrl);               // Send control data to the remote port - Broadcast ???
+        switch(drq.cmd){
+          case 1:                                                  // New program data
+            pn.crc = calculateCRC16(&cnc_ack,sizeof(pn)-2);        // dont forget to add the crc the crc !    
+            ctrludp.write((byte *)&pn, sizeof(pn));
+          break;
+          case 2:                                                  // Board Config Data
+            crc = calculateCRC16(&eboard,sizeof(eboard));        
+            ctrludp.write((byte *)&eboard, sizeof(eboard));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 3:                                                  // Valve Setup data
+            crc = calculateCRC16(&evalve,sizeof(evalve));           
+            ctrludp.write((byte *)&evalve, sizeof(evalve));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 4:                                                  // Fertigation Seup data
+            crc = calculateCRC16(&efert,sizeof(efert));           
+            ctrludp.write((byte *)&efert, sizeof(efert));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 5:                                                  // Filter Setup data
+            crc = calculateCRC16(&efilter,sizeof(efilter));        
+            ctrludp.write((byte *)&efilter, sizeof(efilter));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 6:                                                  // Local IO Config data
+            crc = calculateCRC16(&elocal,sizeof(elocal));           
+            ctrludp.write((byte *)&elocal, sizeof(elocal));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 7:                                                  // ADC System Config data
+            crc = calculateCRC16(&adcs,sizeof(adcs));                
+            ctrludp.write((byte *)&adcs, sizeof(adcs));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 8:                                                  // House Keeping data
+            crc = calculateCRC16(&ghks,sizeof(ghks));              
+            ctrludp.write((byte *)&ghks, sizeof(ghks));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 9:                                                  // EMail config data
+            crc = calculateCRC16(&SMTP,sizeof(SMTP));             
+            ctrludp.write((byte *)&SMTP, sizeof(SMTP));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          default:                                                 // Negative acknoledge - bad request number  
+            drq.spare = 0xff ;
+            drq.crc = calculateCRC16(&drq,sizeof(drq)-2);     
+            ctrludp.write((byte *)&drq, sizeof(drq));
+          break;
+        }
+        ctrludp.endPacket();
+    }
+    else{
+        Serial.println("UDP CRC Fault New Program REJECTED");                    
+    }
+    return(4); 
+  }
+
+  if ( lSize == sizeof(program_new_t) ){       // idc.pn       - can do this for any listed structure
+    memset(&cpn, 0, sizeof(cpn));
+    ctrludp.read((byte *)&cpn, sizeof(program_new_t));             // read the packet into the buffer
+    crc = calculateCRC16(&cpn,sizeof(program_new_t)-2);     
+    if (crc == cpn.crc){                                        // ensure valid data packet crc
+        memcpy(&pn,&cpn,sizeof(program_new_t));  
+        Serial.println("UDP New Program accepted");              
+    }
+    else{
+        Serial.println("UDP CRC Fault New Program REJECTED");                    
+    }
+    return(3); 
+  }
+  
   if ( lSize == sizeof(wet_t) ){
     memset(&cmp, 0, sizeof(cmp));
     ctrludp.read((byte *)&cmp, sizeof(cmp));                               // read the packet into the buffer
@@ -130,6 +214,7 @@ IPAddress ReturnIP ;
           }
         }
       }
+      Serial.println("UDP CNC_ACK Packet Processed");      
     }else{
       Serial.println("CRC Failed on UDP CNC_ACK Packet");      
     }

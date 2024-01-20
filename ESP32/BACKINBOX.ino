@@ -7,12 +7,13 @@ void ResetLoRaParams(void){
 
 void BackInTheBoxMemory(void){
   uint8_t i , j ;
+  Serial.println(F("*** BackInTheBoxMemory Called ***"));  
 
   ResetLoRaParams();
   
   ghks.lProgMethod = 1 ;
   ghks.cpufreq = 240 ;
-  ghks.displaytimer = 0 ;
+  ghks.displaytimer = -1 ;
   ghks.magsens = 128 ;
   
   
@@ -158,8 +159,8 @@ void BackInTheBoxMemory(void){
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
   
 
-  sprintf(ghks.NodeName,"Prickle Patch\0") ;
 
+  sprintf(ghks.NodeName,"ESP32_%X\0",(uint32_t)chipid) ;
   sprintf(ghks.cpassword,"\0");
   
   ghks.fTimeZone = 10.0 ;
@@ -168,7 +169,7 @@ void BackInTheBoxMemory(void){
   ghks.lMaxDisplayValve = MAX_VALVE ;
   sprintf(ghks.timeServer ,"au.pool.ntp.org\0"); 
   ghks.AutoOff_t = 0 ;
-  ghks.localPortCtrl = 8088 ;
+  ghks.localPortCtrl = 8089 ;  // therse two need to be the same
   ghks.RemotePortCtrl= 8089 ;
   ghks.lVersion = MYVER ;
 
@@ -292,6 +293,7 @@ int eeAddress ;
     }else{
       eeAddress = PROG_BASE ;  // 192 which is 48 * sizeof(float)
     }
+/*    
     if ( isnan(ghks.ADC_Cal_Ofs) || isinf(ghks.ADC_Cal_Ofs) ){
       ghks.ADC_Cal_Ofs = 0.0 ;
     }
@@ -300,7 +302,7 @@ int eeAddress ;
     }
     ghks.ADC_Input_PIN1 = constrain(ghks.ADC_Input_PIN1,-1,MaxPinPort);       // 
     ghks.ADC_Input_PIN2 = constrain(ghks.ADC_Input_PIN2,-1,MaxPinPort);       //
-
+*/
     EEPROM.get(eeAddress,evalve);
     eeAddress += sizeof(evalve) ;
     EEPROM.get(eeAddress,vp);
@@ -322,7 +324,9 @@ int eeAddress ;
     eeAddress += sizeof(adcs) ;
     
     Serial.println("Final VPFF EEPROM adress " +String(eeAddress));   
-    
+//    sprintf(ghks.nssid,"TP-LINK_52FC8C\0");    // dougals office
+//    sprintf(ghks.npassword,"0052FC8C\0");
+
   }else{
     ghks.lVersion  =  MYVER_NEW ;
     EEPROM.put(0,ghks);

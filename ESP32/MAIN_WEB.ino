@@ -29,21 +29,21 @@ String strTmp = "" ;
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
   message = F("<!DOCTYPE HTML>");
-  message += "<head><title>Team Trouble - Irrigation Controler " + String(Toleo) + "</title>";
+  message += "<head><title>ESP32 - Irrigation Controler " + String(Toleo) + "</title>";
   message += F("<meta name=viewport content='width=320, auto inital-scale=1'>"); 
   if ( iRefresh > 0 ){
     message += "<meta http-equiv='Refresh' content='"+String(iRefresh)+"'>" ;
   }
   message += F("</head><body><html><center><h3>");   
-  if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
-    strTmp = String(ADC_Value) + " " + String(ghks.ADC_Unit) ;
-  }else{
-    strTmp = "" ;
-  }  
+//  if ( ( ghks.ADC_Alarm_Mode & 0x80 ) != 0 ){
+    strTmp = String(adcs.chan[0].ADC_Value) + " " + String(adcs.chan[0].ADC_Unit) ;
+//  }else{
+//    strTmp = "" ;
+//  }  
   message += String(WiFi.RSSI()) + " (dBm) <a title='click for home / refresh' href='/'>"+String(ghks.NodeName)+"</a> " + strTmp + "</h3>\r\n";
   server.sendContent(message) ;  
   message = "" ;   
-  if ((ghks.displaytimer > 0) || (iDisplayCountDown != 0 )) {   // stop the display balnking out while we are woking on the interface
+  if ((ghks.displaytimer != 0) || (iDisplayCountDown != 0 )) {   // stop the display balnking out while we are woking on the interface
     iDisplayCountDown = ghks.displaytimer ;    
   }
 }

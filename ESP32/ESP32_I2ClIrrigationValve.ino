@@ -1,11 +1,12 @@
 /*
     This project is a distillation of "Project Thor"  ( which started in 2008 )
-    So in that vein you can expect it's lost a little body but the conceptual "active constituents" are present in a concerntrated form.
+    So in that vein you can expect it's lost a little corporeal body but the conceptual "active constituents" are present in a concerntrated form.
 
     The code is designed to work with/in multiple configurations and hardware based around the ESP32.
 
     It was fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
     Newer copies can be found at https://github.com/Dougal121/Essence_of_Thor
+    May contain traces of code by ChatGPT, thankyou "Aiden"
 
     The idea is to provide low cost high tech fertigation/irrigation control for real world farming which is scalable from small to medium size farms (0.1 to 100 Ha)
 
@@ -261,7 +262,8 @@ typedef struct __attribute__((__packed__)) {           //
 typedef struct __attribute__((__packed__)) {
   program_header_t ph[MAX_PROGRAM_HEADER];             // 136 -- only 8 programs
   shift_new_t      sh[MAX_SHIFTS] ;                    // 256 -- 64 valve shifts (same as before sort of)  320  or  448
-} program_new_t ;                                      // 292 whole new program structure so can be wriiten to eeprom in one go  456 or  584
+  uint16_t         crc  ;                              // 2     1/2024 add this in so we can upload programs in one go
+} program_new_t ;                                      // 294 whole new program structure so can be wriiten to eeprom in one go  456 or  584
 
 program_new_t     pn;
 
@@ -301,7 +303,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
 //  long lDisplayOptions  ;               // 86 
   uint8_t lDisplayOptions ;
   uint8_t cpufreq ;                       //    240 160 80   not flash at 26
-  uint8_t displaytimer ;                  //     how log does the wifi stay on for (minutes) ?  0 fo display on always (display piggbacks on this)
+  int displaytimer ;                      //     how log does the wifi stay on for (minutes) ?  0 fo display on always (display piggbacks on this)
   uint8_t magsens ;                       //     magnet sensor sesitivity use instead of the button
   uint8_t lNetworkOptions  ;              // 84 
   uint8_t ValveLogOptions  ;              // 85 
@@ -316,7 +318,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char servername[32] ;
   long SelfReBoot ;
   long lRebootTimeDay ;
-  float ADC_Cal_Mul ;
+/*  float ADC_Cal_Mul ;
   float ADC_Cal_Ofs ;
   char  ADC_Unit[5] ;                     // units for display
   uint8_t  ADC_Alarm_Mode ;               // high low etc   0x80 Contious enable 0x40 Master Valve Only Enable  0x20  Alram 2 master  0x10 Alarm 1 master     0x02 Alarm 1 high   0x01 Alarm 2 high
@@ -324,7 +326,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   float ADC_Alarm2 ;                      // 
   uint16_t  ADC_Alarm_Delay ;             // trigger to alarm in seconds
   uint8_t ADC_Input_PIN1 ;
-  uint8_t ADC_Input_PIN2 ;
+  uint8_t ADC_Input_PIN2 ;*/
   int     SolPulsePower ;
   int     SolContPower ; 
   int     SolMastPower ;
@@ -375,6 +377,12 @@ typedef struct __attribute__((__packed__)) {
   cnc_v_t      cv[MAX_CNC] ;          // the most that we can have   16 x 14 = 224
   uint16_t     crc  ;
 } cnc_t ;                        // 234 bytes
+
+typedef struct __attribute__((__packed__)) {   // data request
+  uint8_t      cmd ;                           // datat type 
+  uint8_t      spare ;
+  uint16_t     crc  ;                          // be shure its valid
+} drq_t ;                        // 234 bytes
 
 typedef struct __attribute__((__packed__)) {
   uint8_t      ValveNo ;
@@ -448,6 +456,22 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
 } Email_App_stuff_t ;          
 
 Email_App_stuff_t SMTP;
+
+typedef union  {                                  // super set union
+  general_housekeeping_stuff_t ghks ;
+  program_new_t         pn;
+  board_t               eboard[MAX_BOARDS] ;   // board list - address and type
+  valve_t               evalve[MAX_VALVE] ;    // eprom backed up stuff 
+  program_a             vp[MAX_VALVE];
+  fertigation_t         efert[MAX_FERT] ;
+  filter_t              efilter[MAX_FILTER] ;  // eprom backed up stuff 
+  local_t               elocal ;
+  valve_totals_t        rtcVT[MAX_VALVE];      // to be read / stored in RTC board eeprom
+  valve_totals_t        rtcTest;               // compare so we dont write the whole thing...  
+  valve_totals_dates_t  rtcVTDates ;           // 
+  adc_stuff_t           adcs ;
+  Email_App_stuff_t     SMTP;
+} ssu_t ;
 
 char cssid[32] = {"Configure_XXXXXXXX\0"} ;
 char *host = "Control_00000000\0";                // overwrite these later with correct chip ID
@@ -527,7 +551,7 @@ bool bLoRaGood = true ;
 bool bFertDisable = false ;
 bool bLoRa = false ; 
 bool bButton = false ;
-int  iDisplayCountDown = 0 ;
+int  iDisplayCountDown = -1 ;
 int magval = 0 ;
 String strBusResults ;
 String strLoRaResults ;
@@ -857,25 +881,29 @@ uint8_t OnPol ;
 //  Serial.println("Setting LoRa Bandwidth " + String(bw));
 //  LoRa.setSignalBandwidth(bw) ;
   
+  Serial.print("Starting LoRa ");    
   while (!LoRa.begin(ghks.iFreq * 100000 ) && (j < 10)) 
   {
     Serial.print(".");
     j++;
     delay(500);
   }
-  Serial.println("Setting LoRa Bandwidth/power/spreading factor ");
-  LoRa.setSignalBandwidth(bw) ;
-  LoRa.setTxPower((int)ghks.iTXPower)  ;
-  LoRa.setSpreadingFactor((int)ghks.iSpread)  ;
   
   if (j == 10) {
-    Serial.println("Starting LoRa failed");    
+    Serial.println(" failed");    
     bLoRa = false ;
   }else{
+    Serial.println(" ok");    
+    Serial.println("Setting LoRa Bandwidth/power/spreading factor ");
+    LoRa.setSignalBandwidth(bw) ;
+    LoRa.setTxPower((int)ghks.iTXPower)  ;
+    LoRa.setSpreadingFactor((int)ghks.iSpread)  ;
     Serial.println("LoRa Initialization OK");  
     bLoRa = true ;
   }
 //  SetSelectedSpeed();
+  iDisplayCountDown = ghks.displaytimer ;   // turn on display
+  Serial.println("Setup Finished");    
 }
 
 //  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
@@ -960,13 +988,15 @@ int iLoRaReturn = 0 ;
     }
     
     if ( bBusGood ){
-      if ( bLoRaGood ){
-      }else{
-        display.drawString(127 , 42, String("-LoRa-"));    
-        if (( rtc_sec % 2 ) == 0 ){
-          display.setColor(INVERSE);
-          display.fillRect(95, 42, 32, 12);
-        }        
+      if (bLoRa ){
+        if ( bLoRaGood ){
+        }else{
+          display.drawString(127 , 42, String("-LoRa-"));    
+          if (( rtc_sec % 2 ) == 0 ){
+            display.setColor(INVERSE);
+            display.fillRect(95, 42, 32, 12);
+          }        
+        }
       }
     }else{
       display.drawString(127 , 42, String("-BUS-"));    
@@ -1032,7 +1062,7 @@ int iLoRaReturn = 0 ;
     }
     if ( iTestMode == -1 ){   // test mode uses this area as well so dont display in test mode
       display.setTextAlignment(TEXT_ALIGN_RIGHT);
-      display.drawString(128 , 33 ,  String(ADC_Value,1)+ String(" (") +String(ghks.ADC_Unit)+ String(" )") );
+      display.drawString(128 , 33 ,  String(adcs.chan[0].ADC_Value,1)+ String(" (") +String(adcs.chan[0].ADC_Unit)+ String(" )") );
       if ( bSentADCAlarmEmail ){
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(128 , 43 ,  String("*") );      
@@ -1317,6 +1347,7 @@ int iLoRaReturn = 0 ;
     if ((  iDisplayCountDown > 0  )&& ( ghks.displaytimer>0)){  //  decrement display saver
        iDisplayCountDown-- ;
        if ((iDisplayCountDown == 0) ) {  //&& ( lMinUpTime > 5 )
+         Serial.print("A-"); 
          StopWiFi();
        }
     }
@@ -1473,7 +1504,7 @@ int iLoRaReturn = 0 ;
   filter_sec();
 //  dnsServer.processNextRequest();
 
-  if ( iDisplayCountDown != 0 ){
+  if (( iDisplayCountDown != 0 ) && (lMinUpTime > 10  )){
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());
     if ( !bPrevConnectionStatus && WiFi.isConnected() ){
        Serial.println(String(buff )+ " WiFi Reconnected OK...");  
@@ -1511,27 +1542,30 @@ int iLoRaReturn = 0 ;
       bPrevConnectionStatus = true ;
     }  
   }
-  
-  if( !bButton ){
-    if ( digitalRead(0) == true ){
-      if ( iDisplayCountDown == 0 ){
-        iDisplayCountDown = ghks.displaytimer ;   // turn on display
-        if (lMinUpTime > 1) {
-          setCpuFrequencyMhz(240);   
-          StartWiFi();
+
+  if ( bLoRa )  {  // the LaRa board has a button that mine does not
+    if( !bButton ){
+      if ( digitalRead(0) == true ){
+        if ( iDisplayCountDown == 0 ){
+          iDisplayCountDown = ghks.displaytimer ;   // turn on display
+          if (lMinUpTime > 1) {
+            setCpuFrequencyMhz(240);   
+            StartWiFi();
+          }
+        }else{
+          iDisplayCountDown = 0 ;   // turn off display
+          Serial.print("B-"); 
+          StopWiFi();
+          display.clear();
+          display.display();  // blank the display
+          SetSelectedSpeed();
         }
-      }else{
-        iDisplayCountDown = 0 ;   // turn off display
-        StopWiFi();
-        display.clear();
-        display.display();  // blank the display
-        SetSelectedSpeed();
+        bButton = true ;  
       }
-      bButton = true ;  
-    }
-  }else{
-    if ( digitalRead(0) == false ){
-      bButton = false ;
+    }else{
+      if ( digitalRead(0) == false ){
+        bButton = false ;
+      }
     }
   }
   if (( bLoRa ) && ( bSendLoRaCNCACK ) && (second() == ( ghks.lNodeAddress % 60 ))){

@@ -69,51 +69,51 @@ bool bRoach = false ;
                 i = MAX_FERT ;
             break ;
             case 5:  // ADC value greater than Alarm 1
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) greater then Alarm 1 \0",ghks.NodeName,ADC_Value, ghks.ADC_Unit )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) greater then Alarm 1 \0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit )  ;  
                 i = MAX_FERT ;
             break ;
             case 6:  // ADC value greater than Alarm 2
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) greater then Alarm 2 \0",ghks.NodeName,ADC_Value,ghks.ADC_Unit )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) greater then Alarm 2 \0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit )  ;  
                 i = MAX_FERT ;
             break ;
             case 7:  // ADC value less than Alarm 1
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) less then Alarm 1 \0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) less then Alarm 1 \0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 8:  // ADC value less than Alarm 2
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) less then Alarm 2 \0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) less then Alarm 2 \0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 9:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 1 when Main Valve on\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 1 when Main Valve on\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 10:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 2 when Main Valve on\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 2 when Main Valve on\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit   )  ;  
                 i = MAX_FERT ;
             break ;
             case 11:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 1 when Main Valve on\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 1 when Main Valve on\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit   )  ;  
                 i = MAX_FERT ;
             break ;
             case 12:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 2 when Main Valve on\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 2 when Main Valve on\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit   )  ;  
                 i = MAX_FERT ;
             break ;
             case 13:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 1 when Main Valve off\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 1 when Main Valve off\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 14:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 2 when Main Valve off\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Greater than Alarm 2 when Main Valve off\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 15:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 1 when Main Valve off\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 1 when Main Valve off\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 16:
-                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 2 when Main Valve off\0",ghks.NodeName,ADC_Value,ghks.ADC_Unit  )  ;  
+                snprintf(csTemp,MESSAGE_MAX,"%s - %f (%s) Less than Alarm 2 when Main Valve off\0",ghks.NodeName,adcs.chan[0].ADC_Value,adcs.chan[0].ADC_Unit  )  ;  
                 i = MAX_FERT ;
             break ;
             case 666:
@@ -273,7 +273,7 @@ void DisplayEmailSetup() {
         break;   
       }
     }
-    i = String(server.argName(j)).indexOf("adp1");
+/*    i = String(server.argName(j)).indexOf("adp1");
     if (i != -1) { // ADC input pin 1
       ghks.ADC_Input_PIN1 = String(server.arg(j)).toInt() ;
     }
@@ -281,7 +281,7 @@ void DisplayEmailSetup() {
     if (i != -1) { // ADC input pin 2
       ghks.ADC_Input_PIN2 = String(server.arg(j)).toInt() ;
     }
-    
+*/    
     i = String(server.argName(j)).indexOf("smse");
     if (i != -1){  // have a request to request a time update
      String(server.arg(j)).toCharArray( SMTP.server , sizeof(SMTP.server)) ;
@@ -378,7 +378,7 @@ void DisplayEmailSetup() {
         SMTP.bSpare = true ;        
       }
     }     
-
+/*
     i = String(server.argName(j)).indexOf("allu");
     if (i != -1){  
      String(server.arg(j)).toCharArray(ghks.ADC_Unit , sizeof(ghks.ADC_Unit)) ;
@@ -469,6 +469,7 @@ void DisplayEmailSetup() {
         ghks.ADC_Alarm_Mode |=  0x01 ;              
       }
     }  
+    */
     i = String(server.argName(j)).indexOf("frtadc");
     if (i != -1){ 
       ghks.lFertActiveOptions = constrain( String(server.arg(j)).toInt(),0,3) ;                      
@@ -509,7 +510,7 @@ void DisplayEmailSetup() {
   message += "<tr><form method=post action=" + server.uri() + "><td>SMTP Secure<input type='hidden' name='smbz' value='0'></td><td align=center><input type='checkbox' name='smbs' " + String(MyCheck)+ "></td><td>.</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   message += "<tr><td>Last Email Status</td><td>"+String(lRet_Email)+"</td><td colspan=2>.</td></tr>\r\n" ;
   message += "<tr></td><td colspan=4>.</td></tr>\r\n" ;
-  message += "<form method=get action=" + server.uri() + "><tr><td>ADC Input PIN 1</td><td align=center><select name='adp1'>" ;
+/*  message += "<form method=get action=" + server.uri() + "><tr><td>ADC Input PIN 1</td><td align=center><select name='adp1'>" ;
   for (ii = MinPinPort; ii < MaxPinPort; ii++) {
     if (ghks.ADC_Input_PIN1 == ii ){
       MyColor = F(" SELECTED ");
@@ -541,15 +542,14 @@ void DisplayEmailSetup() {
     }
   }
   message += "</select></td><td></td><td><input type='submit' value='SET'></td></tr></form>" ;
-  
   message += "<tr><form method=post action=" + server.uri() + "><td>ADC Multiplier</td><td align=center><input title='The number of S.I. units per input Volt x 3.2' type='text' name='adcm' value='"+String(ghks.ADC_Cal_Mul)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   message += "<tr><form method=post action=" + server.uri() + "><td>ADC Offset</td><td align=center><input title='The easy way to do this is use the zero cal button below' type='text' name='adco' value='"+String(ghks.ADC_Cal_Ofs)+"' size=30></td><td></td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
   message += "<tr><form method=post action=" + server.uri() + "><td>ADC SI Units</td><td align=center><input type='text' name='allu' value='"+String(ghks.ADC_Unit)+"' size=30 maxlength=5></td><td></td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
-  message += "<tr><form method=post action=" + server.uri() + "><td>ADC RAW <b> "+String(ADC_Raw1)+" </td><td>ADC Scaled Value <b> "+String(ADC_Value,1)+" </td><td><input type='hidden' name='adco' value='"+String(-1.0*ADC_Raw1)+"'><input title='Setup the transducer for Zero physical input quantity then press this button to calibrate the zero point on computer' type='submit' value='DO ZERO CAL'></td></form></tr>\r\n" ;
+  message += "<tr><form method=post action=" + server.uri() + "><td>ADC RAW <b> "+String(ADC_Raw1)+" </td><td>ADC Scaled Value <b> "+String(ADC_Value,1)+" </td><td><input type='hidden' name='adco' value='"+String(-1.0*ADC_Raw1)+"'><input title='Setup the transducer for Zero physical input quantity then press this button to calibrate the zero point on computer' type='submit' value='DO ZERO CAL'></td></form></tr>\r\n" ;*/
   server.sendContent(message) ;
-//  Serial.println("3 Sent " + String(message.length(),DEC) + " bytes" );
   message = "" ;    
-
+//  Serial.println("3 Sent " + String(message.length(),DEC) + " bytes" );
+/*
   message += "<tr><form method=post action=" + server.uri() + "><td>Master Alarm Enable</td><td> <select name='almmc'>" ;
   switch ( ghks.ADC_Alarm_Mode & 0x80 ){
     case 0:   
@@ -622,9 +622,9 @@ void DisplayEmailSetup() {
   server.sendContent(message) ;
 //  Serial.println("4 Sent " + String(message.length(),DEC) + " bytes" );
   message = "" ;    
-  
+ 
   message += "<tr><form method=post action=" + server.uri() + "><td>Alarm Delay</td><td align=center><input type='text' name='aldl' value='"+String(ghks.ADC_Alarm_Delay)+"' size=30></td><td>(s)</td><td><input type='submit' value='SET'></td></form></tr>\r\n" ;
-
+*/
   message += "<tr><form method=post action=" + server.uri() + "><td>ADC Alarms to disable fert</td>" ;
   message += "<td><select name='frtadc'>" ;
   for ( j = 0 ; j < 4 ; j++ ){ 

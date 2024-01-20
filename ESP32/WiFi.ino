@@ -8,13 +8,13 @@ bool StartWiFi(void){
   if ( cssid[0] == 0 || cssid[1] == 0 ){   // pick a default setup ssid if none
     sprintf(ghks.cpassword,"\0");
   }
-  MyIPC = IPAddress (192, 168, 5 +(chipid & 0x7f ) , 1);
+  MyIPC = IPAddress (192, 168, 4 , 1);   //5 +(chipid & 0x7f )
   Serial.print("Asking for Soft AP on address: ");
   snprintf(buff, BUFF_MAX, ">> IP %03u.%03u.%03u.%03u <<", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);      
   Serial.println(buff);
   WiFi.softAPConfig(MyIPC,MyIPC,IPAddress (255, 255, 255 , 0));  
   Serial.println("Starting access point...");
-  Serial.print("SSID: ");
+  Serial.print("Host SSID: ");
   Serial.println(cssid);
   Serial.print("Password: >");
   Serial.print(ghks.cpassword);
@@ -34,6 +34,12 @@ bool StartWiFi(void){
   if ( ghks.lNetworkOptions != 0 ) {
     WiFi.config(ghks.IPStatic,ghks.IPGateway,ghks.IPMask,ghks.IPDNS ); 
   }  
+  Serial.print("Attaching to Client SSID: ");
+  Serial.println(ghks.nssid);
+  Serial.print("Password: >");
+  Serial.print(ghks.npassword);
+  Serial.println("< ");
+
   if ( ghks.npassword[0] == 0 ){
     WiFi.begin((char*)ghks.nssid);                            // connect to unencrypted access point      
   }else{
@@ -43,6 +49,7 @@ bool StartWiFi(void){
     j = j + 1 ;
     delay(500);
     display.clear();
+    Serial.print(".");
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.drawString(0, 0, "Chip ID " + String((uint32_t)chipid, HEX) );
     display.drawString(0, 9, String("SSID:") );
@@ -62,6 +69,8 @@ bool StartWiFi(void){
   if ( j >= MAX_WIFI_TRIES ) {
      bConfig = true ;
      WiFi.disconnect();
+     Serial.println("");
+     Serial.println("WiFi failed to connect");  
 /*     IPAddress localIp(192, 168, 5 +(ESP.getChipId() & 0x7f ) , 1);
      IPAddress MaskIp(255, 255, 255 , 0);
      WiFi.softAPConfig(localIp,localIp,MaskIp);
@@ -89,8 +98,12 @@ bool StartWiFi(void){
 
 
 bool StopWiFi(void){
-  WiFi.disconnect(true);
-  WiFi.softAPdisconnect(true);
-  WiFi.mode(WIFI_OFF);
-  Serial.println("WiFi OFF");  
+  if (lMinUpTime > 60 ) {
+    WiFi.disconnect(true);
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("WiFi OFF");  
+  }else{
+    Serial.println("WiFi Wants to go OFF");      
+  }
 }
