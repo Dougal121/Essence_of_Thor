@@ -36,6 +36,8 @@
 #include "ds3231.h"            // RTC   --- this one is in my solar tracker projects libs (in GIT )
 #include <ESP_Mail_Client.h>   // Include ESP Mail Client library (this library)
 #include <LoRa.h>              // From the TTGO sites Git Repositry (loaded via arduino IDE lib manager)
+//#include <esp_task_wdt.h>
+//#include <esp32-hal-watchdog.h>
 
 //define the pins used by the LoRa transceiver module
 #define SCK 5
@@ -123,9 +125,9 @@ const byte MAX_MCP23017 = 8 ;    // maximum number of these expanders on a syste
 const byte MAX_CNC = 16 ;
 
 PCF8574 IOEXP[16]{0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f} ;
-SSD1306 display(0x3c, 4 ,15 );   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-//SSD1306 display(0x3c, 5, 4);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
-//SH1106Wire display(0x3c, 4, 5);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
+//SSD1306 display(0x3c, 4 ,15 );   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" TTGO LaRa board
+//SSD1306 display(0x3c, 21, 22);   // GPIO 5 = D1, GPIO 4 = D2   - onboard display 0.96" 
+SH1106Wire display(0x3c, 21, 22);   // arse about ??? GPIO 5 = D1, GPIO 4 = D2  -- external ones 1.3"
 
 
 /*
@@ -530,7 +532,7 @@ bool bDoFertUpload = false ;
 bool bValveActive = false ; 
 bool bValveActiveAny = false ; 
 bool bValveTrans = false ; 
-bool bManSet = false ;
+bool bManSet = true ;
 bool bBusy = false ;
 int iMailMsg = 0 ;
 
@@ -600,6 +602,8 @@ int i , k , j = 0;
 float tmpbw = 125.0 ;
 long  bw = 125000 ;
 uint8_t OnPol ;
+uint8_t OnPulse;
+uint8_t OffPulse;
   
   lRebootCode = random(1,+2147483640) ;  // want to change it straight away
   chipid=ESP.getEfuseMac();         //The chip ID is essentially its MAC address(length: 6 bytes).
@@ -673,15 +677,7 @@ uint8_t OnPol ;
     vfilter[i].bFlush = false ;
     vfilter[i].lTTG = 0 ;    
   }
-
-  for (i = 0 ; i < MAX_MCP23017 ; i++ ) {   // initalise all the boards in the expander structure/array
-      mcp[i].begin(i);              // initalise if board address as 0x20 -> 0x27
-      for (j = 0 ; j < 16 ; j++ ){  // for the 16 bits
-        mcp[i].pinMode(j, OUTPUT);  
-        mcp[i].digitalWrite( j , true) ;   // relay board are generally false is on , true is off (arse about)           
-      }
-  }
-    
+   
   for ( i = 0 ; i < ADC_MAX_CHAN ; i++ ) {  // setup adc pins
     if (( adcs.chan[i].ADC_Input_PIN > MinPinPort) && (adcs.chan[i].ADC_Input_PIN < MaxPinPort )) {
       pinMode(adcs.chan[i].ADC_Input_PIN, INPUT);
@@ -690,6 +686,14 @@ uint8_t OnPol ;
   
   for ( i = 0 ; i < ADC_MAX_ALARM ; i++ ) {  // setup adc trigger values
     ADC_Trigger[i] = 0 ;
+  }
+
+  for (i = 0 ; i < MAX_MCP23017 ; i++ ) {   // initalise all the boards in the expander structure/array
+      mcp[i].begin(i);              // initalise if board address as 0x20 -> 0x27
+      for (j = 0 ; j < 16 ; j++ ){  // for the 16 bits
+        mcp[i].pinMode(j, OUTPUT);  
+        mcp[i].digitalWrite( j , true) ;   // relay board are generally false is on , true is off (arse about)           
+      }
   }
         
   for (i = 0 ; i < MAX_BOARDS ; i++ ) {
@@ -735,9 +739,17 @@ uint8_t OnPol ;
 
   for (i = 0 ; i < MAX_VALVE ; i++ ) {   // setup the defaults in the 3 volitile structs that support data comin back from eeprom
     OnPol = ((evalve[i].OnOffPolPulse & 0x80  ) >> 7  ) ;    
+    OnPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x70  ) >> 4  )) ;
+    OffPulse = SolPulseWidth((int)((evalve[i].OnOffPolPulse & 0x07  )  )) ;
+    if ( evalve[i].OffCoilBoardBit == evalve[i].OnCoilBoardBit ) {  // powered coil
+      ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usefull    
+    }else{  // pulse coil
 //    Serial.println( String(i) + " OnPol " + String(OnPol));
-    ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , 0 ) ;  // was offpol but not usefull
-    ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , 0 ) ;
+//      ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , OnPol , OnPulse ) ;
+//      ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , OnPol , OffPulse ) ;  // was offpol but not usefull
+      ActivateOutput((( evalve[i].OnCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OnCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;
+      ActivateOutput((( evalve[i].OffCoilBoardBit & 0xf0 ) >>4 ) , (evalve[i].OffCoilBoardBit & 0x0f ) , !OnPol , 0 ) ;  // was offpol but not usefull
+    }
   }
   
   if (( ghks.SolContPower & 0x8000 ) != 0 ) {
@@ -810,6 +822,7 @@ uint8_t OnPol ;
   server.on("/iolocal", ioLocalMap);
   server.on("/adc", adcLocalMap);
   server.on("/eeprom", DisplayEEPROM);
+  server.on("/rtceeprom",DisplayRTCEEPROM);  
   server.on("/valvelog",DisplayValveLog);
   server.on("/valvelog.csv", HTTP_GET , DisplayValveLog);  
   server.on("/backup", HTTP_GET , handleBackup);
@@ -903,6 +916,12 @@ uint8_t OnPol ;
   }
 //  SetSelectedSpeed();
   iDisplayCountDown = ghks.displaytimer ;   // turn on display
+
+  iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ;
+  if ( hasRTC ){
+    ReadValveLogsFromEEPROM();  // read in the valve log data
+  }
+  
   Serial.println("Setup Finished");    
 }
 
@@ -1484,7 +1503,20 @@ int iLoRaReturn = 0 ;
       processNTPpacket();
     }
   }
-
+  if ((iValveLogTTG==0)){
+    if ((ghks.ValveLogOptions & 0x7f) != 0 ){ // can switch this off
+      bBusy = false ;
+      for ( i = 0 ; i < MAX_FERT ; i++){  // dont do this if we timing pumps
+        if (vfert[i].bOnOff){
+          bBusy = true ;
+        }
+      }  
+      if (!bBusy){
+        WriteValveLogsToEEPROM() ;
+        iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ; // minutes to the next save
+      }
+    }
+  }
   lRet = ctrludp.parsePacket() ;
   if ( lRet != 0 ) {
     processCtrlUDPpacket(lRet);

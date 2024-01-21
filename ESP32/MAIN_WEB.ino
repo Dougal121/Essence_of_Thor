@@ -53,10 +53,13 @@ String strTmp = "" ;
 void SendHTTPPageFooter(){
   String message = F("<br><a href='/?command=3'>Valve Setup Page 1</a>.. <a href='/?command=4'>Valve Setup Page 2</a><br>\r\n") ;         
   message += F("<a href='/fert'>Fertigation Control Page 1</a>.. <a href='/fert?command=5'>Fertigation Setup Page 2</a> <br> <a href='/filt'>Filter Setup</a><br>\r\n") ;   
-  message += F("<br><a href='/?command=1'>Load Parameters from EEPROM</a><br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
+  message += "<br><a href='"+server.uri()+"?command=1'>Load Parameters from EEPROM</a>";
+  message += F("<br><br><a href='/?command=667'>Reset Memory to Factory Default</a><br><a href='/?command=665'>Sync UTP Time</a><br><a href='/stime'>Manual Time Set</a><br><a href='/scan'>I2C Scan</a><br><a href='/iosc'>Database I/O Scan</a><br><a href='/iolocal'>Local I/O Mapping</a><br>\r\n") ;     
   message += "<a href='/?reboot=" + String(lRebootCode) + "'>Reboot</a><br>\r\n" ;
   message += F("<a href='/?command=668'>Save Fert Current QTY</a><br>\r\n") ;
   message += F("<a href='/eeprom'>EEPROM Memory Contents</a><br>\r\n");
+  message += F("<a href='/rtceeprom'>RTC EEPROM Memory Contents (Valve Log Area)</a><br>\r\n");
+  message += F("<a href='/valvelog'>Valve Log</a><br>\r\n");  
   message += F("<a href='/setup'>Node Setup</a><br>\r\n");
   message += F("<a href='/email'>Email Setup</a><br>\r\n");  
   message += F("<a href='/adc'>ADC Setup</a><br>\r\n");  
@@ -182,7 +185,15 @@ void handleRoot() {
         case 122:
           ResetADCCalInfo();
         break;   
-        
+        case 123:
+          ZeroValveLogsMemory(15);
+        break;
+        case 124:
+          ReadValveLogsFromEEPROM();
+        break;
+        case 125:
+          WriteValveLogsToEEPROM();
+        break;
         case 667: // wipe the memory to factory default
           BackInTheBoxMemory();
         break;

@@ -85,7 +85,7 @@ void i2cScan() {
   uint8_t i, address, error;
   uint8_t first = 0x03 ; 
   uint8_t last = 0x77 ;
-  char buff[10];
+  char buff[BUFF_MAX];
   bool bRecord = false ;
 
   for (uint8_t j=0; j<server.args(); j++){

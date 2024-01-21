@@ -9,7 +9,7 @@ void DisplayEEPROM() {
   int b = 0 ;
   int d = 1 ;
   int  address;
-  char buff[10];
+  char buff[BUFF_MAX];
   String message = "" ;
 
   for (uint8_t j=0; j<server.args(); j++){

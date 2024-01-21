@@ -15,7 +15,7 @@ void BackInTheBoxMemory(void){
   ghks.cpufreq = 240 ;
   ghks.displaytimer = -1 ;
   ghks.magsens = 128 ;
-  
+  ghks.ValveLogOptions = 0 ;
   
   for (i = 0 ; i < MAX_SHIFTS  ; i++ ) {   // NEW PROGRAMMING   ------   Clear all these
     pn.sh[i].Program = 0 ;
@@ -98,7 +98,7 @@ void BackInTheBoxMemory(void){
     efert[i].PumpRate = 0.1 ;
 //    if ( i < 2 ){
       efert[i].DaysEnable = 0xff ;
-      efert[i].BoardBit = 0x90 + i ;  // board 2
+      efert[i].BoardBit = 0x70 + i ;  // board 2
       efert[i].OffTime = 15 ;  
 /*    }else{
       efert[i].DaysEnable = 0x0 ;
@@ -158,7 +158,6 @@ void BackInTheBoxMemory(void){
   sprintf(ghks.nssid,"************\0");  // put your default credentials in here if you wish
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
   
-
 
   sprintf(ghks.NodeName,"ESP32_%X\0",(uint32_t)chipid) ;
   sprintf(ghks.cpassword,"\0");

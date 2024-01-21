@@ -49,6 +49,21 @@ void handleProgramNew(){
   SerialOutParams();
   iProgNum = -1 ;
   for (uint8_t j=0; j<server.args(); j++){
+    i = String(server.argName(j)).indexOf("command");
+    if (i != -1){  // 
+      switch (String(server.arg(j)).toInt()){
+        case 1:  // load values
+          LoadParamsFromEEPROM(true);
+//          Serial.println("Load from EEPROM");
+        break;
+        case 2: // Save values
+          LoadParamsFromEEPROM(false);
+          bSendSaveConfirm = true ;
+
+//          Serial.println("Save to EEPROM");
+        break;
+      }
+    }    
     i = String(server.argName(j)).indexOf("prgm");
     if (i != -1){  // look at the program number else it stays zero
       iProgNum = String(server.arg(j)).toInt() ;  
@@ -126,6 +141,7 @@ void handleProgramNew(){
   }  // for j searching through parameters
 
   SendHTTPHeader();
+  server.sendContent(F("<a href='/prognew?command=2'>Save Parameters to EEPROM</a><br><br>")) ;     
 
 //  server.sendContent(F("<br><center><b>Programing New</b><br>"));
   message = F("<b>Programs</b><br><table border=1 title='Programing New'>");

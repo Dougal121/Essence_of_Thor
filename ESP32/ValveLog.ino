@@ -9,7 +9,7 @@ void DisplayRTCEEPROM() {
   int iAddr = 0 ; 
   int  address = 0 ;
   int  iLen = 256 ;
-  char buff[10];
+  char buff[BUFF_MAX];
   String message ;
 
   for (uint8_t j=0; j<server.args(); j++){
@@ -283,7 +283,7 @@ void UpDateValveLogs(){
   bool bOn ;
   time_t myTime = now() ;
 
-  if ( year(myTime) > 2019 ) { // reset all the totals assuming the clock is not bullshit
+  if ( year(myTime) > 2023 ) { // reset all the totals assuming the clock is not bullshit
     j = weekday(myTime) ;
 //    Serial.println("Valve Total Zero Update " + String(j));
     if (abs( myTime - rtcVTDates.Daily[j-1] ) > SECS_PER_DAY ) {
@@ -310,7 +310,7 @@ void UpDateValveLogs(){
       }
     }
   }
-//  Serial.println("Valve Totalizers Update ");
+  Serial.println("Valve Totalizers Update ");
 
   for (i = 0 ; i < MAX_VALVE ; i++ ) {                // scan all the valves         
     if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){   // look if it has feedback
@@ -374,7 +374,7 @@ int iEDNow = elapsedDays(myDate);
     iED1Jan = elapsedDays(FirstDayOfYear(myDate)) ;     
     return((iEDNow-iED1Jan)+1) ;
 }
-String MAH(int iMin){
+/*String MAH(int iMin){
   if (iMin == 0 ){
     return(String("-:-"));
   }else{
@@ -386,18 +386,37 @@ String MAH(int iMin){
   }
   return(String(buff));
 }
+*/
+#define MAHBUFF_MAX 10
+char mahbuff[MAHBUFF_MAX];
+const char* MAH(int iMin) {
+  if (iMin == 0) {
+    return "-:-";
+  } else {
+    int hours = iMin / 60;
+    int minutes = iMin % 60;
+    
+    if (hours > 24) {
+      snprintf(mahbuff, BUFF_MAX, "%d:%02d:%02d", hours / 24, hours % 24, minutes);
+    } else {
+      snprintf(mahbuff, BUFF_MAX, "%02d:%02d", hours, minutes);
+    }
+  }
+  return mahbuff;
+}
 
 void DisplayValveLog() {
-  uint8_t i ;
+  int i ;
   uint16_t ii ;
   uint32_t iiii ;
   int j , k ;
   int r  = 0  ;
   int b = 0 ;
   int d = 1 ;
+  int mn , dn , mv ;
   int  address;
   bool bDownLoad = false ;
-  char buff[10];
+  char buff[BUFF_MAX];
   String message ;
   String bgcolor ;
   String bgcolor2 ;
@@ -405,13 +424,15 @@ void DisplayValveLog() {
   time_t myTime2 ;
   time_t myBaseTime ;
   
+    Serial.print("0");
+  mv = MAX_VALVE ;
   for (uint8_t j=0; j<server.args(); j++){
     i = String(server.argName(j)).indexOf("command");
     if (i != -1){  // 
       switch (String(server.arg(j)).toInt()){
         case 998:
           ReadValveLogsFromEEPROM();
-          iValveLogTTG = (ghks.ValveLogOptions & 0x1f) * 10 + 20 ; // read data drop eemprom and over right memory
+          iValveLogTTG = (ghks.ValveLogOptions & 0x1f) * 10 + 20 ; // read data drop eemprom and over write memory
         break;
         case 997:
           WriteValveLogsToEEPROM();
@@ -431,12 +452,14 @@ void DisplayValveLog() {
       bDownLoad = true ;
     } 
   }  
+    Serial.print("X");
+  
 //  SerialOutParams();
   if ( bDownLoad ){ 
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "application/octet-stream; charset=utf-8", "");
     message = "Days" ;
-    for ( i = 0 ; i < MAX_VALVE ; i++){
+    for ( i = 0 ; i < mv ; i++){
       message += "," + String(evalve[i].description) ; 
     }
     message += "\r\n" ;
@@ -445,7 +468,7 @@ void DisplayValveLog() {
       myTime = rtcVTDates.Daily[j] ;
       snprintf(buff, BUFF_MAX, "%02d/%02d/%04d", day(myTime), month(myTime), year(myTime) );     
       message += String(buff) ;
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "," + String(rtcVT[i].Daily[j])  ; 
       }
       message += "\r\n" ;
@@ -458,7 +481,7 @@ void DisplayValveLog() {
       myTime = rtcVTDates.Weekly[j] ;
       snprintf(buff, BUFF_MAX, "%02d/%02d/%04d", day(myTime), month(myTime), year(myTime) );     
       message += String(buff) ;
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "," + String(rtcVT[i].Weekly[j])  ; 
       }
       message += "\r\n" ;
@@ -471,7 +494,7 @@ void DisplayValveLog() {
       myTime = rtcVTDates.Monthly[j] ;
       snprintf(buff, BUFF_MAX, "%02d/%02d/%04d", day(myTime), month(myTime), year(myTime) );     
       message += String(buff) ;
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "," + String(rtcVT[i].Monthly[j])  ; 
       }
       message += "\r\n" ;
@@ -482,8 +505,10 @@ void DisplayValveLog() {
     server.sendContent(message) ;
     
   }else{   // not downloading send it user as HTML
+//    esp_task_wdt_add(NULL);
+    Serial.print("1");
     SendHTTPHeader();
-    message = F("<br><b>Valve Logging</b><br><a href='/?command=999'>Reset All Valve Log to Zero</a><br><table border=1 title='Valve Logging'>") ;
+    message = F("<br><b>Valve Logging</b><br><a href='/valvelog?command=999'>Reset All Valve Log to Zero</a><br><table border=1 title='Valve Logging'>") ;
 //    message += F("");
     
     message += "<tr><th>Day</th><th colspan="+String(MAX_VALVE)+">Daily Valve Totals</th></tr>" ; 
@@ -493,14 +518,21 @@ void DisplayValveLog() {
       bgcolor = "" ;    
     }
     message += "<tr><th "+ bgcolor +">.</th>" ; 
-    for ( i = 0 ; i < MAX_VALVE ; i++){
+    for ( i = 0 ; i < mv ; i++){
       message += "<th align=center>" + String(i+1)+ "<br>" + String(evalve[i].description) + "</th>" ; 
     }
     message += "</tr>" ;
+    server.sendContent(message) ;
+    message = "" ;      
+    Serial.print("2");
+//    esp_task_wdt_reset();    
+    
     myBaseTime = previousSunday(now()) ;
+    dn = day(now()) ;
+    mn = month(now());
     for ( j = 0 ; j < MAX_DAYS ; j++){
       myTime = rtcVTDates.Daily[j] ;
-      if ((month(myTime)==month(now())) && (day(myTime)==day(now())) ){
+      if ((month(myTime)==mn) && (day(myTime)==dn) ){
         bgcolor = "bgcolor='yellow'" ;
         bgcolor2 = "bgcolor='#ffff80'" ;
       }else{
@@ -513,7 +545,7 @@ void DisplayValveLog() {
       }else{
         message += "<tr><td " + bgcolor + " align=center>"+DayString(dayOfWeek(myTime),false)+"<br>" + String(buff) + "</td>" ;
       }
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "<td " + bgcolor2 + " align=center>" + MAH(rtcVT[i].Daily[j]) + "</td>" ; 
       }
       message += "</tr>" ;   
@@ -523,13 +555,17 @@ void DisplayValveLog() {
     
     message += "<tr><th>Week</th><th colspan="+String(MAX_VALVE)+">Weelky Valve Totals</th></tr>" ; 
     message += "<tr><th>.</th>" ; 
-    for ( i = 0 ; i < MAX_VALVE ; i++){
+    for ( i = 0 ; i < mv ; i++){
       message += "<th align=center>" + String(i+1)+ "<br>" + String(evalve[i].description) + "</th>" ; 
     }
     message += "</tr>" ;
+    server.sendContent(message) ;
+    message = "" ;      
+    
+    Serial.print("3");
     
     myBaseTime = previousSunday(FirstDayOfYear(now())) ;
-    for ( j = 0 ; j < MAX_WEEKS ; j++){
+    for ( j = 0 ; j < MAX_WEEKS ; j++){  //
       myTime = myBaseTime + (j*SECS_PER_DAY*7) ;
       myTime2 = myTime + (SECS_PER_DAY*6) ;
       snprintf(buff, BUFF_MAX, "%02d/%02d/%04d - %02d/%02d/%04d", day(myTime), month(myTime), year(myTime), day(myTime2), month(myTime2), year(myTime2) );     
@@ -546,20 +582,25 @@ void DisplayValveLog() {
         bgcolor2 = "" ;
       }
       message += "<tr><td " + bgcolor + " title='"+String(buff)+"'>Week " + String(k) + "</td>" ;
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "<td " + bgcolor2 + " align=center>" + MAH(rtcVT[i].Weekly[j]) + "</td>" ; 
       }
       message += "</tr>" ;   
       server.sendContent(message) ;
       message = "" ;      
+    
     }
   
     message += "<tr><th>Month</th><th colspan="+String(MAX_VALVE)+">Monthly Valve Totals</th></tr>" ; 
     message += "<tr><th>.</th>" ; 
-    for ( i = 0 ; i < MAX_VALVE ; i++){
+    for ( i = 0 ; i < mv ; i++){
       message += "<th align=center>" + String(i+1)+ "<br>" + String(evalve[i].description) + "</th>" ; 
     }
     message += "</tr>" ;
+    server.sendContent(message) ;
+    message = "" ;      
+    
+    Serial.print("4");
     
     for ( j = 0 ; j < MAX_MONTHS ; j++){
       if (j==(month(now())-1)) {
@@ -570,7 +611,7 @@ void DisplayValveLog() {
         bgcolor2 = "" ;
       }
       message += "<tr><td " + bgcolor + " title='"+String(year(rtcVTDates.Monthly[j]))+"' align=center>"+MonthString(j+1,false)+"</td>" ;
-      for ( i = 0 ; i < MAX_VALVE ; i++){
+      for ( i = 0 ; i < mv ; i++){
         message += "<td " + bgcolor2 + " align=center>" + MAH(rtcVT[i].Monthly[j]) + "</td>" ; 
       }
       message += "</tr>" ;
@@ -578,7 +619,7 @@ void DisplayValveLog() {
       message = "" ;
     }
     
-    message = "<tr><th colspan=4><a href='/?command=998'>Read Valve Log from EEPROM</a></th><th colspan="+String(MAX_VALVE-7)+"><form method='GET' action=" + server.uri() + ".csv action='' enctype='multipart/form-data'><input type='hidden' name='download' value='doit'><input type='submit' value='Download'></form></th><th colspan=4><a href='/?command=997'>Write Valve Log to EEPROM</a><br></th></tr>" ;
+    message = "<tr><th colspan=4><a href='/valvelog?command=998'>Read Valve Log from EEPROM</a></th><th colspan="+String(MAX_VALVE-7)+"><form method='GET' action=" + server.uri() + ".csv action='' enctype='multipart/form-data'><input type='hidden' name='download' value='doit'><input type='submit' value='Download'></form></th><th colspan=4><a href='/valvelog?command=997'>Write Valve Log to EEPROM</a><br></th></tr>" ;
     message += "</table><br>" ;
     server.sendContent(message) ; 
     SendHTTPPageFooter() ;

@@ -87,18 +87,11 @@ void handleSetup(){
           bSendSaveConfirm = true ;
 //          Serial.println("Save to EEPROM");
         break;
-      }
-    }
-
-    i = String(server.argName(j)).indexOf("command");
-    if (i != -1){  // 
-      switch (String(server.arg(j)).toInt()){
         case 369:  
           ResetLoRaParams();
         break;
-      }  
+      }
     }
-
     
     i = String(server.argName(j)).indexOf("lrspr");
     if (i != -1){  // 
@@ -343,7 +336,38 @@ void handleSetup(){
     if (i != -1){  
        ghks.SolMastPower |= (( 0x01 & String(server.arg(j)).toInt())<<14 )  ;
     }
-            
+    i = String(server.argName(j)).indexOf("vlot");
+    if (i != -1){  // 
+      ghks.ValveLogOptions = ghks.ValveLogOptions & 0xe0 ;
+      ghks.ValveLogOptions = ghks.ValveLogOptions | ( String(server.arg(j)).toInt() & 0x1f ) ;
+    }      
+    i = String(server.argName(j)).indexOf("vlog");  // valve logging
+    if (i != -1){  // 
+      if (String(server.arg(j)).toInt() != 0 ){
+        ghks.ValveLogOptions = ghks.ValveLogOptions | 0x80 ;        
+      }else{
+        ghks.ValveLogOptions = ghks.ValveLogOptions & 0x7f ;
+      }
+    }      
+    i = String(server.argName(j)).indexOf("flog");  // fertigation loggin
+    if (i != -1){  // 
+      if (String(server.arg(j)).toInt() != 0 ){
+        ghks.ValveLogOptions = ghks.ValveLogOptions | 0x40 ;        
+      }else{
+        ghks.ValveLogOptions = ghks.ValveLogOptions & 0xbf ;
+      }
+    }        
+
+    i = String(server.argName(j)).indexOf("rcon");   // remote control
+    if (i != -1){  // 
+      if (String(server.arg(j)).toInt() != 0 ){
+        ghks.ValveLogOptions = ghks.ValveLogOptions | 0x20 ;        
+      }else{
+        ghks.ValveLogOptions = ghks.ValveLogOptions & 0xdf ;
+      }
+    }        
+
+             
   }
   
   SendHTTPHeader();
@@ -504,6 +528,41 @@ void handleSetup(){
   message = "" ;
   
   message += "<form method=post action=" + server.uri() + "><tr><td colspan=3></td></tr>\r\n" ; 
+
+  message += F("<tr><td>Valve Logging</td><td align=center>") ; 
+  message += F("<select name='vlog'>") ;
+  if (( ghks.ValveLogOptions & 0x80) == 0 ){
+    message += F("<option value='0' SELECTED>0 Off"); 
+    message += F("<option value='1'>1 On"); 
+  }else{
+    message += F("<option value='0'>0 Off"); 
+    message += F("<option value='1' SELECTED>1 On"); 
+  }
+  message += "</select></td><td><input type='text' name='vlot' value='" + String((ghks.ValveLogOptions & 0x1f)) + "' size=4 maxlength=2><input type='submit' value='SET'></td></tr>";
+
+  message += F("<tr><td>Fertigation Logging</td><td align=center>") ; 
+  message += F("<select name='flog'>") ;
+  if (( ghks.ValveLogOptions & 0x40) == 0 ){
+    message += F("<option value='0' SELECTED>0 Off"); 
+    message += F("<option value='1'>1 On"); 
+  }else{
+    message += F("<option value='0'>0 Off"); 
+    message += F("<option value='1' SELECTED>1 On"); 
+  }
+  message += F("</select></td><td>.</td></tr>");
+
+  message += F("<tr><td>Remote Control</td><td align=center>") ; 
+  message += F("<select name='rcon'>") ;
+  if (( ghks.ValveLogOptions & 0x20) == 0 ){
+    message += F("<option value='0' SELECTED>0 Off"); 
+    message += F("<option value='1'>1 On"); 
+  }else{
+    message += F("<option value='0'>0 Off"); 
+    message += F("<option value='1' SELECTED>1 On"); 
+  }
+  message += F("</select></td><td>.</td></tr></form>");
+
+  message += "<form method=post action=" + server.uri() + "><tr><td></td><td></td><td></td></tr>" ; 
 
   message += F("<tr><td>Local UDP Port NTP</td><td align=center>") ; 
   message += "<input type='text' name='lpntp' value='" + String(ghks.localPort) + "' size=12></td><td><input type='submit' value='SET'></td></tr>\r\n";
