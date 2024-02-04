@@ -112,8 +112,8 @@ const byte MAX_FERT = 6 ;      // fertigation units MAXIUM of 8 <- DEAL & CODE B
 const byte MAX_FILTER = 1 ;    // can have more but whats the point ? again max of 8
 const byte MAX_CANISTERS = 5;  // maxium of 16 ?? limmit on what the editing page will process
 const byte MAX_DESCRIPTION = 8 ;
-const byte MAX_PROGRAM_HEADER = 8 ;  // these 2 are the new programmin array method
-const byte MAX_SHIFTS = 64 ;
+const byte MAX_PROGRAM_HEADER = 16 ;  // these 2 are the new programmin array method ---- was only using 8 
+const byte MAX_SHIFTS = 96 ;          // was 64 ....  
 const byte MAX_STARTS = 4 ;
 const int  MAX_MINUTES = 10080 ; // maximum minutes in a 7 day cycle
 const byte MAX_BOARDS = 16 ;
@@ -245,7 +245,7 @@ typedef struct __attribute__((__packed__)) {                        // Permanent
   uint8_t Translate;  
 } board_t ;
 
-typedef struct __attribute__((__packed__)) {                        // Permanent record
+typedef struct __attribute__((__packed__)) {           // Permanent record
   uint8_t IOPin[MAX_LOCAL_IO];
 } local_t ;
 
@@ -253,19 +253,19 @@ typedef struct __attribute__((__packed__)) {           //  new programming syste
   char      Description[MAX_DESCRIPTION] ;             // program numer is explicit as the array index
   uint8_t   WDays ;                                    // enable days + master enable
   int16_t   StartTime[MAX_STARTS] ;                    // start time  8 bit + 8 bit   HH:MM  
-} program_header_t ;                                   // 17 bytes ?  by say 8 ==> 136 bytes
+} program_header_t ;                                   // 17 bytes ?  by say 8 ==> 136 bytes    or 16 ==> 272 bytes
 
 typedef struct __attribute__((__packed__)) {           // 
   uint8_t   Program ;                                  // 5 bit Shift No - 3 Bits Program No number (8 programs 32 shifts in each)
   uint32_t  ValveNo ;                                  // one bit for every valve  ?
   int16_t   RunTime ;                                  // runtime in minutes
-} shift_new_t ;                                        // 4 bytes by say 32 or 64 ???  5 if uint16_t --- 7 if uint32_t
+} shift_new_t ;                                        // 4 bytes by say 32 or 64 ???  5 if uint16_t --- 7 if uint32_t    96 x 7  ===>  672
 
 typedef struct __attribute__((__packed__)) {
-  program_header_t ph[MAX_PROGRAM_HEADER];             // 136 -- only 8 programs
-  shift_new_t      sh[MAX_SHIFTS] ;                    // 256 -- 64 valve shifts (same as before sort of)  320  or  448
+  program_header_t ph[MAX_PROGRAM_HEADER];             // 136 -- only 8 programs   272 for 16
+  shift_new_t      sh[MAX_SHIFTS] ;                    // 256 -- 64 valve shifts (same as before sort of)  320  or  448     or   672
   uint16_t         crc  ;                              // 2     1/2024 add this in so we can upload programs in one go
-} program_new_t ;                                      // 294 whole new program structure so can be wriiten to eeprom in one go  456 or  584
+} program_new_t ;                                      // 294 whole new program structure so can be wriiten to eeprom in one go  456 or  584   ==>  946
 
 program_new_t     pn;
 
@@ -283,7 +283,53 @@ valve_totals_t    rtcTest;               // compare so we dont write the whole t
 valve_totals_dates_t  rtcVTDates ;       // 
 fertigation_log_que_item_t  flq[MAX_FERT_LOGS] ; // memory only structure
 
+//class GeneralHousekeepingStuff {
+//public:
 typedef struct __attribute__((__packed__)) {     // eeprom stuff
+  unsigned int localPort = 123;          // 2 local port to listen for NTP UDP packets
+  unsigned int localPortCtrl = 8089;      // 4 local port to listen for Control UDP packets
+  unsigned int RemotePortCtrl = 8089;     // 6 local port to listen for Control UDP packets
+  uint8_t lProgMethod ;                      // 10
+  uint8_t iSpread ;                       // LoRa Spread Factor
+  uint8_t iTXPower ;                      // LoRa TX Power   
+  uint8_t  SPARE ;
+  uint8_t lPulseTime ;                    // 14  this is the gap between valves
+  int     iFreq ;                         //  LoRa Frequency
+  uint8_t iBandWidth ;                    //  LoRa Bandwidth
+  long lMaxDisplayValve ;                 // 18
+  long lNodeAddress ;                     // 22 
+  float fTimeZone ;                       // 26 
+  IPAddress RCIP ;                        // (192,168,2,255)  30
+  char NodeName[16] ;                     // 46 
+  char nssid[16] ;                        // 62  
+  char npassword[16] ;                    // 78
+  time_t AutoOff_t ;                      // 82     auto off until time > this date   
+//  long lDisplayOptions  ;               // 86 
+  uint8_t lDisplayOptions ;
+  uint8_t cpufreq ;                       //    240 160 80   not flash at 26
+  int displaytimer ;                      //     how log does the wifi stay on for (minutes) ?  0 fo display on always (display piggbacks on this)
+  uint8_t magsens ;                       //     magnet sensor sesitivity use instead of the button
+  uint8_t lNetworkOptions  ;              // 84 
+  uint8_t ValveLogOptions  ;              // 85 
+  uint8_t lFertActiveOptions  ;           // 86   was lSpare2
+  char timeServer[24] ;                   // 110   = {"au.pool.ntp.org\0"}
+  char cpassword[16] ;                    // 126
+  long lVersion  ;                        // 130
+  IPAddress IPStatic ;                    // (192,168,0,123)   
+  IPAddress IPGateway ;                   // (192,168,0,1)    
+  IPAddress IPMask ;                      // (255,255,255,0)   
+  IPAddress IPDNS ;                       // (192,168,0,15)     
+  char servername[32] ;
+  long SelfReBoot ;
+  long lRebootTimeDay ;
+  int     SolPulsePower ;
+  int     SolContPower ; 
+  int     SolMastPower ;
+}  general_housekeeping_stuff_t ;          // computer says it's 
+general_housekeeping_stuff_t ghks ;
+/*
+class GeneralHousekeepingStuff {
+public:
   unsigned int localPort = 2390;          // 2 local port to listen for NTP UDP packets
   unsigned int localPortCtrl = 8666;      // 4 local port to listen for Control UDP packets
   unsigned int RemotePortCtrl = 8664;     // 6 local port to listen for Control UDP packets
@@ -320,21 +366,12 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   char servername[32] ;
   long SelfReBoot ;
   long lRebootTimeDay ;
-/*  float ADC_Cal_Mul ;
-  float ADC_Cal_Ofs ;
-  char  ADC_Unit[5] ;                     // units for display
-  uint8_t  ADC_Alarm_Mode ;               // high low etc   0x80 Contious enable 0x40 Master Valve Only Enable  0x20  Alram 2 master  0x10 Alarm 1 master     0x02 Alarm 1 high   0x01 Alarm 2 high
-  float ADC_Alarm1 ;
-  float ADC_Alarm2 ;                      // 
-  uint16_t  ADC_Alarm_Delay ;             // trigger to alarm in seconds
-  uint8_t ADC_Input_PIN1 ;
-  uint8_t ADC_Input_PIN2 ;*/
   int     SolPulsePower ;
   int     SolContPower ; 
   int     SolMastPower ;
-} general_housekeeping_stuff_t ;          // computer says it's 136 not 130 ??? is my maths crap ????
-
-general_housekeeping_stuff_t ghks ;
+};          // computer says it's 
+GeneralHousekeepingStuff ghks;
+*/
 
 typedef struct __attribute__((__packed__)) {     // eeprom stuff
   float ADC_Cal_Mul ;                            // 
@@ -459,6 +496,7 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
 
 Email_App_stuff_t SMTP;
 
+/*
 typedef union  {                                  // super set union
   general_housekeeping_stuff_t ghks ;
   program_new_t         pn;
@@ -473,7 +511,7 @@ typedef union  {                                  // super set union
   valve_totals_dates_t  rtcVTDates ;           // 
   adc_stuff_t           adcs ;
   Email_App_stuff_t     SMTP;
-} ssu_t ;
+} ssu_t ;*/
 
 char cssid[32] = {"Configure_XXXXXXXX\0"} ;
 char *host = "Control_00000000\0";                // overwrite these later with correct chip ID
@@ -612,7 +650,7 @@ uint8_t OffPulse;
   Serial.begin(115200);
   Serial.setDebugOutput(true);  
   Serial.println("");          // new line after the startup burst
- 
+  
   pinMode(ESP32_BUILTIN_LED,OUTPUT);  //  D4 builtin LED
 //  pinMode(SETPMODE_PIN,INPUT_PULLUP);
   
@@ -917,12 +955,14 @@ uint8_t OffPulse;
 //  SetSelectedSpeed();
   iDisplayCountDown = ghks.displaytimer ;   // turn on display
 
-  iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ;
+  iValveLogTTG = ((int)(ghks.ValveLogOptions & 0x3f) ) * 10 + 20 ;
   if ( hasRTC ){
     ReadValveLogsFromEEPROM();  // read in the valve log data
   }
   
   Serial.println("Setup Finished");    
+//  Serial.println("ghks as a type " + String(sizeof(ghks)));
+//  Serial.println("ghks as a class " + String(sizeof(ghksc)));
 }
 
 //  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
@@ -1504,7 +1544,7 @@ int iLoRaReturn = 0 ;
     }
   }
   if ((iValveLogTTG==0)){
-    if ((ghks.ValveLogOptions & 0x7f) != 0 ){ // can switch this off
+    if ((ghks.ValveLogOptions & 0x80) != 0 ){ // can switch this off
       bBusy = false ;
       for ( i = 0 ; i < MAX_FERT ; i++){  // dont do this if we timing pumps
         if (vfert[i].bOnOff){
@@ -1513,7 +1553,7 @@ int iLoRaReturn = 0 ;
       }  
       if (!bBusy){
         WriteValveLogsToEEPROM() ;
-        iValveLogTTG = (ghks.ValveLogOptions & 0x7f) * 10 + 20 ; // minutes to the next save
+        iValveLogTTG = (int)(ghks.ValveLogOptions & 0x3f) * 10 + 20 ; // minutes to the next save
       }
     }
   }

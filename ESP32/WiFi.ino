@@ -3,6 +3,7 @@ bool StartWiFi(void){
   
   WiFi.disconnect();
   Serial.println("Configuring soft access point...");
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);    // Set WiFi RF power output to highest level  // 
   WiFi.mode(WIFI_AP_STA);  // we are having our cake and eating it eee har
   sprintf(cssid,"Configure_%08X\0",chipid);
   if ( cssid[0] == 0 || cssid[1] == 0 ){   // pick a default setup ssid if none

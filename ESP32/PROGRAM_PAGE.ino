@@ -39,6 +39,7 @@ void handleProgramNew(){
   int i , ii , iTmp , iX ;
   uint8_t j , k , kk ;
   int iProgNum ;
+  long lTmp ;
   String message ;  
   String MyNum ;  
   String MyColor ;
@@ -81,9 +82,9 @@ void handleProgramNew(){
       }      
       i = String(server.argName(j)).indexOf("s" + MyNum + "rt");
       if (i != -1){  // 
-        k = String(server.arg(j)).toInt()  ;
-        k = constrain(k,0,MAX_MINUTES) ;
-        pn.sh[ii].RunTime = k ;
+        lTmp = String(server.arg(j)).toInt()  ;
+        lTmp = constrain(lTmp,0,MAX_MINUTES) ;
+        pn.sh[ii].RunTime = lTmp ;
       }        
       i = String(server.argName(j)).indexOf("s" + MyNum + "pr");
       if (i != -1){  // 

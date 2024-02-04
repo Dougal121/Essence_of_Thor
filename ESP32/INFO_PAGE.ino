@@ -385,7 +385,7 @@ void handleSetup(){
   }else{
     MyColor =  "" ;
   }
-  message += "<tr><td "+String(MyColor)+">Auto Off Until</td><td align=center>" ; 
+  message += "<tr><td "+String(MyColor)+">Automation Off Until after</td><td align=center>" ; 
   message += "<input type='text' name='atoff' value='"+ String(buff) + "' size=12></td><td>(yyyy/mm/dd)</td></tr>\r\n";
 
   message += F("<tr><td>Activation Pulse</td><td align=center>") ; 

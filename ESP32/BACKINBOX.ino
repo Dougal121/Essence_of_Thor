@@ -15,7 +15,7 @@ void BackInTheBoxMemory(void){
   ghks.cpufreq = 240 ;
   ghks.displaytimer = -1 ;
   ghks.magsens = 128 ;
-  ghks.ValveLogOptions = 0 ;
+  ghks.ValveLogOptions = 0x82 ;
   
   for (i = 0 ; i < MAX_SHIFTS  ; i++ ) {   // NEW PROGRAMMING   ------   Clear all these
     pn.sh[i].Program = 0 ;
@@ -159,6 +159,7 @@ void BackInTheBoxMemory(void){
   sprintf(ghks.npassword,"********\0");  // put your default credentials in here if you wish
   
 
+
   sprintf(ghks.NodeName,"ESP32_%X\0",(uint32_t)chipid) ;
   sprintf(ghks.cpassword,"\0");
   
@@ -168,10 +169,13 @@ void BackInTheBoxMemory(void){
   ghks.lMaxDisplayValve = MAX_VALVE ;
   sprintf(ghks.timeServer ,"au.pool.ntp.org\0"); 
   ghks.AutoOff_t = 0 ;
-  ghks.localPortCtrl = 8089 ;  // therse two need to be the same
+  ghks.localPort = 123 ;       // NTP port
+  ghks.localPortCtrl = 8089 ;   // therse two need to be the same
   ghks.RemotePortCtrl= 8089 ;
   ghks.lVersion = MYVER ;
-
+  ghks.SelfReBoot = 10080 ;
+  ghks.lRebootTimeDay = 600 ;
+  
   ghks.SolPulsePower = 0 ;
   ghks.SolContPower = 0 ;
   
@@ -191,7 +195,11 @@ void BackInTheBoxMemory(void){
   ghks.IPGateway[2] = 0 ;
   ghks.IPGateway[3] = 1 ;
 
-  ghks.IPDNS = ghks.IPGateway ;
+//  ghks.IPDNS = ghks.IPGateway ;
+  ghks.IPDNS[0] = 8 ;
+  ghks.IPDNS[1] = 8 ;
+  ghks.IPDNS[2] = 4 ;
+  ghks.IPDNS[3] = 4 ;
 
   ghks.IPMask[0] = 255 ;
   ghks.IPMask[1] = 255 ;
