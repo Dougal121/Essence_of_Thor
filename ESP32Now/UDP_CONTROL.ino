@@ -1,0 +1,465 @@
+const int UDP_PACKET_SIZE = 48;       // UDP time stamp is in the first 48 bytes of the message
+
+
+/*#include "EspNowMesh.h"
+void MeshDataHandler(mesh_packet_t &pkt)  //
+{
+    cnc_t cnc;
+    memcpy(&cnc, pkt.payload, sizeof(cnc_t));
+
+    // now use cnc normally
+}*/
+int MeshDataHandler(const uint8_t* data, int len)
+{
+  int iRet = 0;
+//  Serial.println("MeshDataHandler len " + String(len)+ " "+String(sizeof(mesh_cnc_t)));      
+  if (len != sizeof(mesh_cnc_t))
+      return iRet;
+
+  mesh_cnc_t cnc;
+  memcpy(&cnc, data, sizeof(cnc) < len ? sizeof(cnc) : len );
+//  Serial.println("MeshDataHandler valves " + String(cnc.valves)+ " " +String(cnc.dnode)+ " "+String(ghks.lNodeAddress));      
+  if ((cnc.dnode == ghks.lNodeAddress)&& (cnc.valves>0)){   // mine mine mine
+    for ( int i  = 0 ;  i < cnc.valves ; i++ ){ // only process live ones
+      int ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
+      Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
+      if (( ii >= 0 ) && (i < MAX_CNC ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
+        if ( evalve[ii].bEnable ){
+          vvalve[ii].lATTG = cnc.cv[i].lATTG ;
+        } 
+        vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
+        vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
+        evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
+        evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
+        Serial.println("ESPNow Uplinked data accepted Valve No " + String(ii));      
+      }
+    }
+    iRet = 1 ; // ie we processed it 
+  }
+  return iRet; 
+}
+
+
+unsigned long sendCTRLpacket(){
+int ii = 0 ;
+    for ( int i  = 0 ;  i < MAX_VALVE ; i++ ){
+      if (( evalve[i].Node != ghks.lNodeAddress ) && ( evalve[i].Node != 0 ) && (( evalve[i].Valve & 0x80 ) == 0x00 ) && (ii < MAX_CNC)) {           // && ( evalve[i].Valve != 0 )
+        ii++ ;                                                                             // count and check if we have some to do
+      }
+    }
+    if ( ii > 0 ){                                                                         // there are valves to be uplinked
+      if ( bMesh  &&  (( ghks.iUseNetwork & 0x01 ) != 0x00 )){
+        Serial.println("Sending CTRL packet - via mesh");
+        if (sendCTRLpacketESPNow()>0){
+          bTXMeshCtrl = true ;
+        }
+      } 
+      if (( ghks.iUseNetwork & 0x02 ) != 0x00 )  {
+        Serial.println("Sending CTRL packet - via WiFi");
+        if ( WiFi.isConnected()){
+          if (sendCTRLpacketWiFi() > 0){
+            bTXWiFiCtrl = true ;
+          }
+        }
+      }
+    }
+    return(0); 
+}
+
+int sendCTRLpacketESPNow(){
+mesh_cnc_t  cnc ;  
+uint8_t nodeList[MAX_NODES];
+int nodeCount = 0;
+int ii = 0 , iRet = 0 ;
+
+//  Serial.println("send CTRL packet called...");                      
+  cnc.snode = (uint8_t)( ghks.lNodeAddress & 0xff ) ;
+  ii = 0 ;
+
+  for ( int i  = 0 ;  i < MAX_VALVE ; i++ ){
+    if (( evalve[i].Node != ghks.lNodeAddress ) && ( evalve[i].Node != 0 ) && (( evalve[i].Valve & 0x80 ) == 0x00 ) && (ii < MAX_CNC)) {           // && ( evalve[i].Valve != 0 )
+      uint8_t node = evalve[i].Node ;
+      bool bFound = false;
+      for ( int j = 0 ; j < nodeCount ; j++ )
+      {
+        if (nodeList[j] == node)
+        {
+            bFound = true;
+            break;
+        }
+      }
+      if (!bFound && ( nodeCount < MAX_NODES ))
+        nodeList[nodeCount++] = node;
+      ii++ ;                                                                            
+    }
+  }
+  
+//  Serial.println("Send Node Count "+String(nodeCount));
+  for (int n = 0; n < nodeCount; n++)
+  {
+    int node = nodeList[n];
+    cnc.snode = ghks.lNodeAddress;
+    cnc.dnode = node ;
+    int count = 0;
+    ii = 0 ;
+    for (int v = 0; v < MAX_VALVE; v++)
+    {
+      if (evalve[v].Node != node)
+        continue;
+
+      cnc.cv[ii].lTTG = vvalve[v].lTTG ;
+      cnc.cv[ii].lATTG = vvalve[v].lATTG ;
+      cnc.cv[ii].lTTC = vvalve[v].lTTC ;
+      cnc.cv[ii].Fertigate = evalve[v].Fertigate ;
+      cnc.cv[ii].Flowrate = evalve[v].Flowrate ;
+      cnc.cv[ii].ValveNo = ( evalve[v].Valve -1 ) & 0x7f ;                               // top bit it indicate this recieves data
+
+      if (ii++ >= MAX_CNC){
+          cnc.valves = ii ;
+          mesh.sendData((byte *)&cnc, sizeof(cnc));
+          ii = 0 ;
+      }
+    }
+    cnc.valves = ii ;
+    if (ii > 0){
+      mesh.sendData((byte *)&cnc, sizeof(cnc));
+      Serial.println("sendCTRLpacketESPNow sent cnc");
+    }
+  }
+  iRet = ii ; 
+
+  for ( int j  = 0 ;  j < MAX_VALVE ; j++ ){
+    if (( evalve[j].Node != ghks.lNodeAddress ) && ( evalve[j].Node != 0 ) && (( evalve[j].Valve & 0x80 ) == 0x00 ) ) {       // && ( evalve[i].Valve != 0 )
+      for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                                                                             // setup the defaults in the remote nodes list
+        if (( remlist[i].node == evalve[j].Node ) || ( remlist[i].node == -1 )) {
+          remlist[i].txt =  now() ;     
+          remlist[i].node = evalve[j].Node ;       
+          i = MAX_REM_LIST ;     
+        }
+      }          
+    }
+  }
+  return(iRet); 
+}
+
+int sendCTRLpacketWiFi(){
+int j ;  
+cnc_t  cnc ;  
+String strDestIP ;
+int ii = 0 , iRet = 0  ;
+
+//    Serial.println("send CTRL packet called...");                      
+  cnc.cmd = 42 ;
+  cnc.snode = (uint8_t)( ghks.lNodeAddress & 0xff ) ;
+  cnc.mc = now() ; // set master clock
+  ii = 0 ;
+
+  for ( int i  = 0 ;  i < MAX_VALVE ; i++ ){
+    if (( evalve[i].Node != ghks.lNodeAddress ) && ( evalve[i].Node != 0 ) && (( evalve[i].Valve & 0x80 ) == 0x00 ) && (ii < MAX_CNC)) {           // && ( evalve[i].Valve != 0 )
+      cnc.cv[ii].lTTG = vvalve[i].lTTG ;
+      cnc.cv[ii].lATTG = vvalve[i].lATTG ;
+      cnc.cv[ii].lTTC = vvalve[i].lTTC ;
+      cnc.cv[ii].Fertigate = evalve[i].Fertigate ;
+      cnc.cv[ii].Flowrate = evalve[i].Flowrate ;
+      cnc.cv[ii].Node = evalve[i].Node ;
+      cnc.cv[ii].ValveNo = ( evalve[i].Valve -1 ) & 0x7f ;                               // top bit it indicate this recieves data
+      ii++ ;                                                                             // increment for next time
+    }
+  }
+  cnc.valves = ii ;
+  cnc.crc = calculateCRC16(&cnc,sizeof(cnc)-2);
+  iRet = ii ;
+
+  if ( ii > 0 ){                                                                         // there are valves to be uplinked
+    if (WiFi.isConnected() &&  (( ghks.iUseNetwork & 0x02 ) != 0x00 ))  {
+      if  (( ghks.RCIP[0] == 0 ) &&  ( ghks.RCIP[1] == 0 ) && ( ghks.RCIP[2] == 0 ) && ( ghks.RCIP[3] == 0 )){
+        Serial.println("No DNS - no point sending NTP to 0.0.0.0 ");      
+      }else{
+          strDestIP = GetCNCIP();
+//          Serial.println("Sending CTRL packet - IP port - address: "+String(ghks.RemotePortCtrl)+" ->  " + strDestIP);
+          ctrludp.beginPacket( strDestIP.c_str() , ghks.RemotePortCtrl);                                 // Send control data to the remote port - Broadcast ???
+          ctrludp.write((byte *)&cnc, sizeof(cnc));
+          ctrludp.endPacket();
+      }
+    }
+    else{
+      Serial.println("No WiFi for uplink ???");
+    }
+  
+    for ( int j  = 0 ;  j < MAX_VALVE ; j++ ){
+      if (( evalve[j].Node != ghks.lNodeAddress ) && ( evalve[j].Node != 0 ) && (( evalve[j].Valve & 0x80 ) == 0x00 ) ) {       // && ( evalve[i].Valve != 0 )
+        for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                                                                             // setup the defaults in the remote nodes list
+          if (( remlist[i].node == evalve[j].Node ) || ( remlist[i].node == -1 )) {
+            remlist[i].txt =  now() ;     
+            remlist[i].node = evalve[j].Node ;       
+            i = MAX_REM_LIST ;     
+          }
+        }          
+      }
+    }
+  }
+  return(iRet); 
+}
+
+
+unsigned long processCtrlUDPpacket(long lSize){
+int i , j ;  
+int ii ;
+byte packetBuffer[16];
+unsigned long timediff ;
+cnc_t  cnc ;  
+wet_t  cmp ;
+program_new_t cpn;
+//ssu_t icd ; // incoming data ( the structure is the union superset of the max bytes it can be)
+drq_t drq;
+uint16_t  crc ;
+String strDestIP ;
+IPAddress ReturnIP ;
+
+  Serial.println("Process UDP data via WiFi " + String(lSize) + " bytes");  
+  if ( lSize == sizeof(drq) ){    
+    memset(&drq, 0, sizeof(drq));
+    ctrludp.read((byte *)&drq, sizeof(drq));                               // read the packet into the buffer
+    crc = calculateCRC16(&drq,sizeof(drq)-2);     
+    if (crc == drq.crc){                                                   // ensure valid command and packet crc
+        Serial.println("UDP Request to Uplink data " + String(drq.crc) + " accepted");              
+        snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ReturnIP[0], ReturnIP[1], ReturnIP[2], ReturnIP[3]);    // return the acknologe to the sender      
+        ctrludp.beginPacket( buff, ghks.RemotePortCtrl);               // Send control data to the remote port - Broadcast ???
+        switch(drq.cmd){
+          case 1:                                                  // New program data
+            pn.crc = calculateCRC16(&cnc_ack,sizeof(pn)-2);        // dont forget to add the crc the crc !    
+            ctrludp.write((byte *)&pn, sizeof(pn));
+          break;
+          case 2:                                                  // Board Config Data
+            crc = calculateCRC16(&eboard,sizeof(eboard));        
+            ctrludp.write((byte *)&eboard, sizeof(eboard));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 3:                                                  // Valve Setup data
+            crc = calculateCRC16(&evalve,sizeof(evalve));           
+            ctrludp.write((byte *)&evalve, sizeof(evalve));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 4:                                                  // Fertigation Seup data
+            crc = calculateCRC16(&efert,sizeof(efert));           
+            ctrludp.write((byte *)&efert, sizeof(efert));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 5:                                                  // Filter Setup data
+            crc = calculateCRC16(&efilter,sizeof(efilter));        
+            ctrludp.write((byte *)&efilter, sizeof(efilter));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 6:                                                  // Local IO Config data
+            crc = calculateCRC16(&elocal,sizeof(elocal));           
+            ctrludp.write((byte *)&elocal, sizeof(elocal));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 7:                                                  // ADC System Config data
+            crc = calculateCRC16(&adcs,sizeof(adcs));                
+            ctrludp.write((byte *)&adcs, sizeof(adcs));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 8:                                                  // House Keeping data
+            crc = calculateCRC16(&ghks,sizeof(ghks));              
+            ctrludp.write((byte *)&ghks, sizeof(ghks));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          case 9:                                                  // EMail config data
+            crc = calculateCRC16(&SMTP,sizeof(SMTP));             
+            ctrludp.write((byte *)&SMTP, sizeof(SMTP));
+            ctrludp.write((byte *)&crc, sizeof(crc));
+          break;
+          default:                                                 // Negative acknoledge - bad request number  
+            drq.spare = 0xff ;
+            drq.crc = calculateCRC16(&drq,sizeof(drq)-2);     
+            ctrludp.write((byte *)&drq, sizeof(drq));
+          break;
+        }
+        ctrludp.endPacket();
+    }
+    else{
+        Serial.println("UDP CRC Fault New Program REJECTED");                    
+    }
+    return(4); 
+  }
+
+  if ( lSize == sizeof(program_new_t) ){       // idc.pn       - can do this for any listed structure
+    memset(&cpn, 0, sizeof(cpn));
+    ctrludp.read((byte *)&cpn, sizeof(program_new_t));             // read the packet into the buffer
+    crc = calculateCRC16(&cpn,sizeof(program_new_t)-2);     
+    if (crc == cpn.crc){                                        // ensure valid data packet crc
+        memcpy(&pn,&cpn,sizeof(program_new_t));  
+        Serial.println("UDP New Program accepted");              
+    }
+    else{
+        Serial.println("UDP CRC Fault New Program REJECTED");                    
+    }
+    return(3); 
+  }
+  
+  if ( lSize == sizeof(wet_t) ){
+    memset(&cmp, 0, sizeof(cmp));
+    ctrludp.read((byte *)&cmp, sizeof(cmp));                               // read the packet into the buffer
+    crc = calculateCRC16(&cmp,sizeof(cmp)-2);     
+    if (crc == cmp.crc){                                                   // ensure valid command and packet crc
+      if ( cmp.cmd == 43 ){                                                // someting different
+        j = MAX_CNC ;
+        if ( j > cmp.valves ) 
+          j = cmp.valves ;                                                 // only do valid ones
+        for (int i = 0 ; i < j ; i++ ) {                                   // setup the defaults in the remote nodes list
+          if (( cmp.mp[i].ValveNo < MAX_VALVE ) && ( cmp.mp[i].ValveNo >= 0)  && (cmp.mp[i].Node == ghks.lNodeAddress) ) {   //   vvalve
+            vvalve[cmp.mp[i].ValveNo].dblMoisture = cmp.mp[i].Wet ;
+            vvalve[cmp.mp[i].ValveNo].dblTemp = cmp.mp[i].Temp ;
+            vvalve[cmp.mp[i].ValveNo].dblDepth = cmp.mp[i].Depth ;
+            vvalve[cmp.mp[i].ValveNo].mpTime = cmp.mc ;
+          }
+        }        
+        Serial.println("UDP moisture Packet processed");              
+      }
+    }else{
+      Serial.println("CRC Failed on UDP moisture Packet");              
+    }
+    return(2);  
+  }
+  
+  if ( lSize ==  sizeof(cnc_ack) ){
+    ctrludp.read((byte *)&cnc_ack, sizeof(cnc_ack));                                  // read the packet into the buffer
+    crc = calculateCRC16(&cnc_ack,sizeof(cnc_ack)-2);     
+    if (crc == cnc_ack.crc){                                                          // ensure valid command and packet crc
+      if ( cnc_ack.cmd == 42 ){
+        for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {                                   // setup the defaults in the remote nodes list
+          if (( remlist[i].node = cnc_ack.snode ) || ( remlist[i].node = -1 )){
+            remlist[i].node = cnc_ack.snode ;
+            remlist[i].TxRssi =  cnc_ack.Rssi  ;
+            remlist[i].TxSnr = cnc_ack.Snr ;
+            remlist[i].txt =  cnc_ack.mc ;     
+            remlist[i].RxRssi = WiFi.RSSI()  ;
+            remlist[i].RxSnr =  0 ;
+            remlist[i].rxt =  now() ;     
+            remlist[i].total = cnc_ack.total ;
+            remlist[i].uplinked = cnc_ack.uplinked ;   
+            remlist[i].TotalPackets++ ;
+            i = MAX_REM_LIST ;                                  // exit as we have found the target  
+          }
+        }
+      }
+      Serial.println("UDP CNC_ACK Packet Processed");      
+    }else{
+      Serial.println("CRC Failed on UDP CNC_ACK Packet");      
+    }
+  }else{   // if not ack packet then it must be cnc
+    
+    memset(&cnc, 0, sizeof(cnc));
+    memset(&cnc_ack, 0, sizeof(cnc));
+    cnc_ack.Rssi = WiFi.RSSI() ;      // start to build the ackknolode packet 
+    cnc_ack.Snr = 0 ;
+    cnc_ack.FE = 0 ;
+    cnc_ack.snode = ghks.lNodeAddress ;
+    cnc_ack.mc = now() ;
+    
+    ctrludp.read((byte *)&cnc, sizeof(cnc)); // read the packet into the buffer
+    crc = calculateCRC16(&cnc,sizeof(cnc)-2);
+    ReturnIP = ctrludp.remoteIP(); 
+    
+    cnc_ack.cmd = cnc.cmd ;
+    if ( crc == cnc.crc ){
+      switch(cnc.cmd ){ // command byte
+        case 42:
+          j = MAX_CNC ;
+          if ( j > cnc.valves ) 
+            j = cnc.valves ;
+          cnc_ack.total = j ;
+          timediff = abs(cnc.mc - now());
+          if ((( timediff > 30 ) && ( timediff < SECS_PER_DAY )) || ( year() < 2020 )){   // the 2020 exception is for startup
+            setTime((time_t)cnc.mc);   // set node to the master clock
+            snprintf(buff, BUFF_MAX, "Time set from master clock %d/%02d/%02d %02d:%02d:%02d", year(), month(), day() , hour(), minute(), second());          
+            Serial.println( String(buff)) ;                   
+          }              
+          for ( int i  = 0 ;  i < j ; i++ ){ // only process live ones
+            ii = ( cnc.cv[i].ValveNo & 0x7f ) ; 
+            Serial.println("Valve " + String(ii) + " Uplink (42) status " + String(evalve[ii].Valve));      
+            if (( ii >= 0 ) && (i < MAX_CNC ) && ((evalve[ii].Valve & 0x80) != 0)){  // valve to accept uplink and valve number in range
+              if ( ghks.lNodeAddress == cnc.cv[i].Node ){
+                if ( evalve[ii].bEnable ){
+                  vvalve[ii].lATTG = cnc.cv[i].lATTG ;
+                } 
+                vvalve[ii].lTTG = cnc.cv[i].lTTG ; 
+                vvalve[ii].lTTC = cnc.cv[i].lTTC ; 
+                evalve[ii].Fertigate = cnc.cv[i].Fertigate ;
+                evalve[ii].Flowrate = cnc.cv[i].Flowrate ;
+                Serial.println("Uplinked data accepted Valve No " + String(ii));      
+                cnc_ack.uplinked++ ;
+              }
+            }
+          }
+          break;
+      }
+      snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ReturnIP[0], ReturnIP[1], ReturnIP[2], ReturnIP[3]);    // return the acknologe to the sender      
+      cnc_ack.crc = calculateCRC16(&cnc_ack,sizeof(cnc_ack)-2);                                        // dont forget to add the crc the crc !    
+      ctrludp.beginPacket( buff, ghks.RemotePortCtrl);                                                 // Send control data to the remote port - Broadcast ???
+      ctrludp.write((byte *)&cnc_ack, sizeof(cnc_ack));
+      ctrludp.endPacket();
+    }else{
+      Serial.println("CRC Failed on UDP CNC Packet");
+    }
+  }
+
+  while (ctrludp.available()){  // clean out the rest of the packet and dump overboard
+    ctrludp.read(packetBuffer, sizeof(packetBuffer));  
+  } 
+}
+
+bool  ClearRemoteNodeList(void){
+  for (int i = 0 ; i < MAX_REM_LIST ; i++ ) {   // setup the defaults in the remote nodes list
+    remlist[i].node = -1 ;
+    remlist[i].RxRssi = 0  ;
+    remlist[i].RxSnr = 0 ;
+    remlist[i].TxRssi = 0  ;
+    remlist[i].TxSnr = 0 ;
+    remlist[i].rxt = 0 ;
+    remlist[i].txt = 0 ;
+    remlist[i].total = 0 ;
+    remlist[i].uplinked = 0 ; 
+    remlist[i].TotalPackets = 0 ;
+  }
+  return (true);
+}
+
+uint16_t calculateCRC16(const void* data, size_t size)
+{
+    const uint16_t polynomial = 0x1021;
+    uint16_t crc = 0xFFFF;
+
+    const byte* byteData = static_cast<const byte*>(data);
+    for (size_t i = 0; i < size; ++i)
+    {
+        crc ^= (static_cast<unsigned short>(byteData[i]) << 8);
+        for (int j = 0; j < 8; ++j)
+        {
+            crc = ((crc & 0x8000) ? ((crc << 1) ^ polynomial) : (crc << 1));
+        }
+    }
+    return crc;
+}
+
+
+String GetCNCIP (void)
+{
+  if (( ghks.RCIP[0] == 0 ) && ( ghks.RCIP[1] == 0 ) && ( ghks.RCIP[2] == 0 )){
+    switch(ghks.RCIP[3]){
+      case 2:
+        snprintf(buff, BUFF_MAX, "%u.%u.%u.255\0", MyIPC[0], MyIPC[1], MyIPC[2]);    
+      break;
+      default:
+        snprintf(buff, BUFF_MAX, "%u.%u.%u.255\0", MyIP[0], MyIP[1], MyIP[2]);    
+      break;
+    }
+  }else{
+      snprintf(buff, BUFF_MAX, "%u.%u.%u.%u\0",ghks.RCIP[0], ghks.RCIP[1], ghks.RCIP[2], ghks.RCIP[3]);    
+  }
+  return(String(buff));
+}
+
+
+
