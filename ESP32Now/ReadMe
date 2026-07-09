@@ -1,0 +1,10 @@
+The ESP32Now version is born
+
+21/04/2026   Start with the LoRa Version and strip it all out
+05/05/2026   Add support/class for Boards That 74LS595 shift register drivers
+07/05/2026   Add support for RS-485 modbus RTU 
+09/05/2026   Start on Moiodbust UDP support
+10/06/2026   Get ESPNow and mesh networking going .. have AI help with 3 new classes to manage the radio and mesh networking
+20/06/2026    Work on user interface to support the new options of both WiFi and ESPNow as backbone 
+01/07/2026   Start on dedicated PCB for this project
+09/07/2026   Mesh Networking going ... relays appear to be working
