@@ -8,3 +8,4 @@ The ESP32Now version is born
 20/06/2026    Work on user interface to support the new options of both WiFi and ESPNow as backbone 
 01/07/2026   Start on dedicated PCB for this project
 09/07/2026   Mesh Networking going ... relays appear to be working
+21/07/2026   More smooshing code to get space
