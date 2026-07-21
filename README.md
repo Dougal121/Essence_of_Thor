@@ -6,9 +6,9 @@ First versions running on the ESP8266 <br>
 Compiled in the arduino IDE and trageting LOLIN (WeMos) ESP8266/ESP32 compatible bopards.<br>
 
 More details on construction
-https://www.hackster.io/dougal/essence-of-thor-part-1-4a83a1
-https://www.hackster.io/dougal/beyond-essence-of-irrigation-part-2-lora-flavor-743704
-https://www.hackster.io/dougal/beyond-essence-of-irrigation-part-3-epsnow-flavor-4b7d6e
+https://www.hackster.io/dougal/essence-of-thor-part-1-4a83a1<br>
+https://www.hackster.io/dougal/beyond-essence-of-irrigation-part-2-lora-flavor-743704<br>
+https://www.hackster.io/dougal/beyond-essence-of-irrigation-part-3-epsnow-flavor-4b7d6e<br>
 
 <b>I/O Support for</b><br>
 MCP23017 (via I2C)<br>
