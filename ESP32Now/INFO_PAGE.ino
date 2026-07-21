@@ -7,13 +7,16 @@ void handleInfo(){
   String MyColor2 ;
   byte mac[6];
 
-
-  SerialOutParams();
+//  SerialOutParams();
   
-  for (uint8_t j=0; j<server.args(); j++){
-  }
-  
-  SendHTTPHeader();
+//  for (uint8_t j=0; j<server.args(); j++){
+//  }
+  SendHTTPHeader(60);
+  getLocalTime(&timeinfo);   // declared in main var list of program
+  snprintf(buff, BUFF_MAX, "<h4>%d/%02d/%02d %02d:%02d", timeinfo.tm_year+1900, timeinfo.tm_mon+1, timeinfo.tm_mday , timeinfo.tm_hour, timeinfo.tm_min);
+  server.sendContent(buff);
+  server.sendContent(F("<br>Mesh Nodes</h4>"));    
+  server.sendContent(mesh.getNodeListHtml());
 
   message = F("<br><center><b>Node Info - (");
   message += String(ghks.lNodeAddress) + ")</b>";
@@ -27,52 +30,74 @@ void handleInfo(){
   server.sendContent(F("</b><br><table border=1 title='Device Info'>"));
   snprintf(buff, BUFF_MAX, "%s %s\n", __DATE__, __TIME__);
   server.sendContent("<tr><td>Firmware Build Date</td><td colspan=2 align=center>"+String(buff)+"</td></tr>") ; 
-  server.sendContent("<tr><td>ESP ID</td><td align=center>0x" + String((uint32_t)chipid, HEX) + "</td><td align=center>"+String((uint32_t)chipid)+"</td></tr>" ) ; 
+  esp_reset_reason_t r = esp_reset_reason();
+  snprintf(buff, BUFF_MAX,"%s (%d)\n", GetResetReasonText(r), r);
+//  server.sendContent("<tr><td>Last Boot Reason</td><td>" +String(buff)+ "</td><td></td></tr>") ; 
+  sendTableContent("Last Boot Reason",String(buff) ,".");
+//  server.sendContent("<tr><td>ESP ID</td><td align=center>0x" + String((uint32_t)chipid, HEX) + "</td><td align=center>"+String((uint32_t)chipid)+"</td></tr>" ) ; 
+  sendTableContent("ESP ID",String((uint32_t)chipid, HEX) ,String((uint32_t)chipid));
+
   MyIP =  WiFi.localIP() ;
   snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIP[0],MyIP[1],MyIP[2],MyIP[3]);
-  server.sendContent("<tr><td>Network Node IP Address</td><td align=center>" + String(buff) + "</td><td>.</td></tr>" ) ; 
+//  server.sendContent("<tr><td>Network Node IP Address</td><td align=center>" + String(buff) + "</td><td>.</td></tr>" ) ; 
+  sendTableContent("Network Node IP Address",String(buff) ,".");
+
   MyIPC = WiFi.softAPIP();  // get back the address to verify what happened  
   snprintf(buff, BUFF_MAX, "%03u.%03u.%03u.%03u", MyIPC[0],MyIPC[1],MyIPC[2],MyIPC[3]);
-  server.sendContent("<tr><td>Config Node IP Address</td><td align=center>" + String(buff) + "</td><td>.</td></tr>" ) ; 
+
+/*  server.sendContent("<tr><td>Config Node IP Address</td><td align=center>" + String(buff) + "</td><td>.</td></tr>" ) ; 
   server.sendContent("<tr><td>Time Server</td><td align=center>" + String(ghks.timeServer) + "</td><td>.</td></tr>" ) ; 
   server.sendContent("<tr><td>Network SSID</td><td align=center>" + String(ghks.nssid) + "</td><td>.</td></tr>" ) ; 
   server.sendContent("<tr><td>Network Password</td><td align=center>" + String(ghks.npassword) + "</td><td>.</td></tr>" ) ; 
   server.sendContent("<tr><td>Configure SSID</td><td align=center>" + String(ghks.cssid) + "</td><td>.</td></tr>" ) ; 
-  server.sendContent("<tr><td>Configure Password</td><td align=center>" + String(ghks.cpassword) + "</td><td>.</td></tr>" ) ; 
+  server.sendContent("<tr><td>Configure Password</td><td align=center>" + String(ghks.cpassword) + "</td><td>.</td></tr>" ) ; */
+  sendTableContent("Config Node IP Address",String(buff) ,".");
+  sendTableContent("Time Server",String(ghks.timeServer) ,".");
+  sendTableContent("Network SSID", String(ghks.nssid) ,".");
+  sendTableContent("Network Password",String(ghks.npassword) ,".");
+  sendTableContent("Configure SSID",String(ghks.cssid) ,".");
+  sendTableContent("Configure Password",String(ghks.cpassword) ,".");
   
-  server.sendContent("<tr><td>WiFi RSSI</td><td align=center>" + String(WiFi.RSSI()) + "</td><td>(dBm)</td></tr>" ) ; 
-  server.sendContent("<tr><td>WiFi Channel</td><td align=center>" + String(rf.getChannel()) + "</td><td>()</td></tr>" ) ; 
+//  server.sendContent("<tr><td>WiFi RSSI</td><td align=center>" + String(WiFi.RSSI()) + "</td><td>(dBm)</td></tr>" ) ; 
+//  server.sendContent("<tr><td>WiFi Channel</td><td align=center>" + String(rf.getChannel()) + "</td><td>()</td></tr>" ) ; 
+  sendTableContent("WiFi RSSI",String(WiFi.RSSI()) ,"(dBm)");
+  sendTableContent("WiFi Channe",String(rf.getChannel()) ,"()");
   
   WiFi.macAddress(mac);      
   snprintf(buff, BUFF_MAX, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  server.sendContent("<tr><td>MAC Address</td><td align=center>" + String(buff) + "</td><td align=center>.</td></tr>" ) ; 
+//  server.sendContent("<tr><td>MAC Address</td><td align=center>" + String(buff) + "</td><td align=center>.</td></tr>" ) ; 
  
-  server.sendContent("<tr><td>Last Scan Speed</td><td align=center>" + String(lScanLast) + "</td><td>(per second)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>ESP Chip Cores</td><td align=center>" + String(ESP.getChipCores()) + "</td><td>.</td></tr>" ) ;
-  server.sendContent("<tr><td>ESP Core Version</td><td align=center>" + String(ESP.getCoreVersion()) + "</td><td>.</td></tr>" ) ;    
-  server.sendContent("<tr><td>ESP Chp Revision</td><td align=center>" + String(ESP.getChipRevision()) + "</td><td>.</td></tr>" ) ;    
-  server.sendContent("<tr><td>SDK Version</td><td align=center>" + String(ESP.getSdkVersion()) + "</td><td>.</td></tr>" ) ;    
-//  server.sendContent("<tr><td>CPU Volts</td><td align=center>" + String(ESP.getVcc()) + "</td><td>(V)</td></tr>" ) ;    
-  server.sendContent("<tr><td>CPU Frequecy</td><td align=center>" + String(ESP.getCpuFreqMHz()) + "</td><td>(MHz)</td></tr>" ) ;    
-  server.sendContent("<tr><td>XTAL Frequecy</td><td align=center>" + String(getXtalFrequencyMhz()) + "</td><td>(MHz)</td></tr>" ) ;    
-  server.sendContent("<tr><td>APB Frequecy</td><td align=center>" + String(getApbFrequency()/1000000) + "</td><td>(MHz)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>Get Rest Reason</td><td align=center>" + String(ESP.getResetReason()) + "</td><td></td></tr>" ) ;    
-//  server.sendContent("<tr><td>Get Reset Into</td><td align=center>" + String(ESP.getResetInfo()) + "</td><td></td></tr>" ) ;    
-//  server.sendContent("<tr><td>Get Sketch Size</td><td align=center>" + String(ESP.getSketchSize()) + "</td><td>(Bytes)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>Free Sketch Space</td><td align=center>" + String(ESP.getFreeSketchSpace()) + "</td><td>(Bytes)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>Magnetic Sensor Value</td><td align=center>" + String(magval) + "</td><td>(?)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>LoRa Bandwidth</td><td align=center>" + String(LoRa.getSignalBandwidth()) + "</td><td>(kBps)</td></tr>" ) ;    
-//  server.sendContent("<tr><td>LoRa Spreading Factor</td><td align=center>" + String(LoRa.getSpreadingFactor()) + "</td><td>(?)</td></tr>" ) ;    
+  sendTableContent("MAC Address",String(buff),".");
+
+  sendTableContent("Last Scan Speed",String(lScanLast),"(per second)");
+  sendTableContent("ESP Core Software Version",String(ESP.getCoreVersion()),".");
+  sendTableContent("ESP Chip Model",String(ESP.getChipModel()),".");
+  sendTableContent("ESP Chip Cores",String(ESP.getChipCores()),".");
+  sendTableContent("ESP Chip Revision",String(ESP.getChipRevision()),".");
+  sendTableContent("Espressif SDK Version",String(ESP.getSdkVersion()),".");
+  sendTableContent("CPU Frequecy",String(ESP.getCpuFreqMHz()),"MHz");
+  sendTableContent("XTAL Frequecy",String(getXtalFrequencyMhz()),"MHz");
+  sendTableContent("APB Frequecy",String(getApbFrequency()/1000000),"MHz");
+
+  sendTableContent("Flash Chip Size",String(ESP.getFlashChipSize() / (1024 * 1024)),"MB");
+  sendTableContent("Flash Chip Speed",String(ESP.getFlashChipSpeed() / (1000000)),"MHz");
+  sendTableContent("Sketch Size",String(ESP.getSketchSize()),"Bytes");
+  sendTableContent("Max Sketch Size",String(ESP.getFreeSketchSpace()),"Bytes");
+  sendTableContent("Current Free Heap",String(ESP.getFreeHeap()/1024),"KB");
+  sendTableContent("Min Free Heap Since Boot",String(ESP.getMinFreeHeap()/1024),"KB");
+  sendTableContent("Largest Heap Block",String(ESP.getMaxAllocHeap()/1024),"KB");
   
 
   snprintf(buff, BUFF_MAX, "%d:%02d:%02d",(lMinUpTime/1440),((lMinUpTime/60)%24),(lMinUpTime%60));
-  server.sendContent("<tr><td>Computer Uptime</td><td align=center>"+String(buff)+"</td><td>(day:hr:min)</td></tr>" ) ;
-
-  server.sendContent(F("</table><br><br>Mesh Nodes"));    
-
-  server.sendContent(mesh.getNodeListHtml());
-
+  sendTableContent("Computer Uptime",String(buff),"(day:hr:min)");
+  server.sendContent(F("</table>"));    //<br><br>Mesh Nodes
+//  server.sendContent(mesh.getNodeListHtml());
   SendHTTPPageFooter();
+}
+
+void sendTableContent(String param, String value , String unit)
+{
+  server.sendContent("<tr><td>" + param + "</td><td align=center>" + value + "</td><td align=center>" + unit + "</td></tr>\r\n") ;    
 }
 
 
@@ -109,7 +134,8 @@ void handleSetup(){
         break;
       }
     }
-    
+
+  /*  
     i = String(server.argName(j)).indexOf("lrspr");
     if (i != -1){  // 
       ghks.iSpread = String(server.arg(j)).toInt() ;
@@ -125,7 +151,7 @@ void handleSetup(){
       ghks.iFreq = String(server.arg(j)).toInt() ;
       ghks.iFreq = constrain(ghks.iFreq,9150,9285);
     }
-
+*/
 
     i = String(server.argName(j)).indexOf("espn");
     if (i != -1){  // 
@@ -151,8 +177,25 @@ void handleSetup(){
 //      ghks.fTimeZone = constrain(ghks.fTimeZone,-12,12);
       ghks.gmtOffset_sec = fTmp * 3600 ; 
       ghks.gmtOffset_sec = constrain(ghks.gmtOffset_sec,-12*3600,12*3600);
+//      Serial.println(String(ghks.gmtOffset_sec));
       bDoTimeUpdate = true ; // trigger and update to fix the time
     }        
+    i = String(server.argName(j)).indexOf("dsoff");
+    if (i != -1){  // 
+      float fTmp = String(server.arg(j)).toFloat() ;
+//      ghks.fTimeZone = constrain(ghks.fTimeZone,-12,12);
+      ghks.daylightOffset_sec = fTmp * 3600 ; 
+      ghks.daylightOffset_sec = constrain(ghks.daylightOffset_sec,-2*3600,2*3600);
+//      Serial.println(String(ghks.daylightOffset_sec));
+      bDoTimeUpdate = true ; // trigger and update to fix the time
+    }     
+    i = String(server.argName(j)).indexOf("posix");
+    if (i != -1){  // have a request to request a time update
+     String(server.arg(j)).toCharArray( ghks.timePOSIXZone , sizeof(ghks.timePOSIXZone)) ;
+     ConfigureTime();
+    }
+
+
     i = String(server.argName(j)).indexOf("disop");
     if (i != -1){  // 
       ghks.lDisplayOptions = String(server.arg(j)).toInt() ;
@@ -404,6 +447,11 @@ void handleSetup(){
   }
   
   SendHTTPHeader();
+
+  getLocalTime(&timeinfo);   // declared in main var list of program
+  snprintf(buff, BUFF_MAX, "<h4>%d/%02d/%02d %02d:%02d</h4>", timeinfo.tm_year+1900, timeinfo.tm_mon+1, timeinfo.tm_mday , timeinfo.tm_hour, timeinfo.tm_min);
+  server.sendContent(buff);
+
   server.sendContent(F("<a href='/setup?command=2'>Save Parameters to EEPROM</a><br>")) ;     
 
   message += "<form method=post action=" + server.uri() + "><table border=1 title='Node Settings'>";
@@ -426,9 +474,14 @@ void handleSetup(){
 
   message += F("<tr><td>Node Address</td><td align=center>") ; 
   message += "<input type='text' name='ndadd' value='" + String(ghks.lNodeAddress) + "' size=12></td><td>"+String(ghks.lNodeAddress & 0xff)+"</td></tr>\r\n";
-
-  message += F("<tr><td>Time Zone</td><td align=center>") ; 
-  message += "<input type='text' name='tzone' value='" + String((float)ghks.gmtOffset_sec/(float)3600.0,1) + "' size=12></td><td>(Hours)</td></tr>\r\n";
+  if (ghks.timePOSIXZone[0]==0){ // dont display if on POSIX
+    message += F("<tr><td>Time Zone</td><td align=center>") ; 
+    message += "<input type='text' name='tzone' value='" + String((float)ghks.gmtOffset_sec/(float)3600.0,1) + "' size=12></td><td>(Hours)</td></tr>\r\n";
+    message += F("<tr><td>Daylight Savings</td><td align=center>") ; 
+    message += "<input type='text' name='dsoff' value='" + String((float)ghks.daylightOffset_sec/(float)3600.0,1) + "' size=12></td><td>(Hours)</td></tr>\r\n";
+  }
+  message += F("<tr><td title='Blank To Use Above'>POSIX Time Zone</td><td align=center>") ; 
+  message += "<input type='text' name='posix' value='" + String(ghks.timePOSIXZone) + "' size=32 maxlength=32></td><td><a href='https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv'>Examples</a></td></tr>\r\n";
 
   message += F("<tr><td>Self Reboot Timer</td><td align=center>") ; 
   message += "<input type='text' name='srbt' value='" + String( ghks.SelfReBoot) + "' size=8 maxlength=8></td><td>(min)</td></tr>";

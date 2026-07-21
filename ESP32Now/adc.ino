@@ -124,8 +124,6 @@ void adcLocalMap() {
     if (i != -1){ 
       adcs.alarm[chan].ADC_Value = String(server.arg(j)).toInt() ;
     }      
-     
-    
   }
   
   //  ######################  START RESPONCE  ########################
@@ -198,7 +196,7 @@ void adcLocalMap() {
       break;
     }
     message += "</select></td><td><input type='text' name='almll' value='"+String(adcs.alarm[j].ADC_Value)+"' size=6></td><td><input type='text' name='almdl' value='"+String(adcs.alarm[j].ADC_Delay)+"' size=6></td>" ;
-    message += "<td><input type='submit' value='SET'></td></form></tr>\r\n" ;
+    message += F("<td><input type='submit' value='SET'></td></form></tr>\r\n") ;
     server.sendContent(message) ;
     message = "" ;
   }
@@ -265,7 +263,7 @@ bool bTrigger = false ;
 bool bTriggerLess = false ;
 bool bTriggerMore = false ;
 int i , k  ;  
-      for ( i = 0 ; i < ADC_MAX_CHAN ; i++ ) {
+    for ( i = 0 ; i < ADC_MAX_CHAN ; i++ ) {
       if (( adcs.chan[i].ADC_Input_PIN > MinPinPort) && (adcs.chan[i].ADC_Input_PIN < MaxPinPort )) {
         adcs.chan[i].ADC_RAW = analogRead(adcs.chan[i].ADC_Input_PIN) ;
         adcs.chan[i].ADC_Value = ((adcs.chan[i].ADC_Cal_Mul * (( 1.0 * adcs.chan[i].ADC_RAW ) + adcs.chan[i].ADC_Cal_Ofs ) / 1023 ) )  ;

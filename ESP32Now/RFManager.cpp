@@ -399,3 +399,19 @@ void RFManager::setLastMsgId(uint32_t id)
 {
     _msgId = id;
 }
+
+void RFManager::StartMDNS(const char *hostName)
+{
+    if (_mdnsStarted)
+        return;
+
+    if (WiFi.status() != WL_CONNECTED)
+        return;
+
+    if (MDNS.begin(hostName))
+    {
+        MDNS.addService("_http", "_tcp", 80);
+        _mdnsStarted = true;
+        Serial.printf("mDNS: %s.local\n", hostName);
+    }
+}

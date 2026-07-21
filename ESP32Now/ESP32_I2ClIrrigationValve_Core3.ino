@@ -6,7 +6,7 @@
 
     It was fabricated at code works of Plummer Software in Coomealla, Australia circa 2019
     Newer copies can be found at https://github.com/Dougal121/Essence_of_Thor
-    May contain traces of code by ChatGPT, thankyou "Aiden"
+    May contain traces of code by ChatGPT, thankyou "AIden"
 
     The idea is to provide low cost high tech fertigation/irrigation control for real world farming which is scalable from small to medium size farms (0.1 to 100 Ha)
 
@@ -17,8 +17,8 @@
    Compiles for LOLIN D32 @ 80Mhz
    Minimal SPIFFS (Large APPS with OTA)
    
-   Builds with 3.X or ESP32 Core
-       
+   Builds with 3.3.8  ESP32 Core
+       Having trouble downloading on some boards in IDE 2.13 ?  so use ol 1.8.12 for first download then use OTA ?
 */
 #define BUILD_TIME (__DATE__ " " __TIME__)
 #define SECS_PER_DAY  60*60*24
@@ -179,16 +179,16 @@ CRGB leds[NUM_LEDS];
 #include "StaticPages.h"
 
 //                 0x11223344
-#define MYVER 0x12435678     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
-#define MYVER_NEW 0x12345680     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+#define MYVER 0x12435679     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
+#define MYVER_NEW 0x12345681     // change this if you change the structures that hold data that way it will force a "backinthebox" to get safe and sane values from eeprom
 const int button = 0;    //Push Button address / used to wake up wifi on remote nodes
 
-const int MAX_EEPROM = 4000 ;
+const int MAX_EEPROM = 4096 ;
 //const byte SETPMODE_PIN = D8 ; 
 //const byte FLASH_BTN = D3 ;    // GPIO 0 = FLASH BUTTON 
 //const byte SCOPE_PIN = D7 ;
-const int PROG_BASE = 192 ;   // where the irrigation valve setup and program information starts in eeprom
-const int PROG_BASE_NEW = 320 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE = 400 ;   // where the irrigation valve setup and program information starts in eeprom
+const int PROG_BASE_NEW = 400 ;   // where the irrigation valve setup and program information starts in eeprom
 const byte MAX_VALVE =  32 ;   // these two easily changed just watch the memory 
 const byte MAX_BOARD_TYPES = 7 ; // number of types of IO available
 const byte MAX_REM_LIST = 16 ; // number of remote nodes to monitor
@@ -418,7 +418,8 @@ typedef struct __attribute__((__packed__)) {     // eeprom stuff
   int     SolPulsePower ;
   int     SolContPower ; 
   int     SolMastPower ;
-}  general_housekeeping_stuff_t ;          // computer says it's 
+  char timePOSIXZone[32] ;                 //
+}  general_housekeeping_stuff_t ;          // computer says it's   400 bytes
 general_housekeeping_stuff_t ghks ;
 /*
 class GeneralHousekeepingStuff {
@@ -748,7 +749,12 @@ int NumberOK (float target) {
   return (tmp);
 }
 */
-
+void ConfigureTime(){
+  if (ghks.timePOSIXZone[0] != 0 )
+    configTzTime(ghks.timePOSIXZone, ghks.timeServer);
+  else
+    configTime(ghks.gmtOffset_sec, ghks.daylightOffset_sec, ghks.timeServer);  
+}
 
 
 const char* GetResetReasonText(esp_reset_reason_t r)
@@ -767,7 +773,30 @@ const char* GetResetReasonText(esp_reset_reason_t r)
     }
 }
 
+void setupDisplayInit()
+{
+  display.init();
+  if (( ghks.lDisplayOptions & 0x01 ) != 0 ) {  // if bit one on then flip the display
+    display.flipScreenVertically();
+  }
+}
 
+void setupDisplayScreen()
+{
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);  
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(63, 0, F("Irrigation"));
+  display.drawString(63, 16, F("Controler"));
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);  
+  display.drawString(0, 40, F("Copyright (c) 2026"));
+  display.drawString(0, 50, F("Dougal Plummer"));
+  display.setTextAlignment(TEXT_ALIGN_RIGHT);  
+  display.drawString(127, 50, String(Toleo));
+  display.setFont(ArialMT_Plain_10);
+  display.display();
+}
 
 
 //  ############################################## SETUP  #################################################################  SETUP   #############################
@@ -786,17 +815,16 @@ uint8_t OffPulse;
 
   ghks.lMaxDisplayValve = MAX_VALVE ;
   Serial.begin(115200);
-  Serial.setDebugOutput(true);  
+  Serial.setDebugOutput(false);  
   Serial.println("");          // new line after the startup burst
 
   SerialRS485.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
   modbus.beginRTU(SerialRS485, 9600, RS485_DE);
 
-  esp_reset_reason_t r = esp_reset_reason();
-  Serial.printf("[BOOT] Reason: %s (%d)\n", GetResetReasonText(r), r);
+ // esp_reset_reason_t r = esp_reset_reason();
+ // Serial.printf("[BOOT] Reason: %s (%d)\n", GetResetReasonText(r), r);
   
   pinMode(ESP32_BUILTIN_LED,OUTPUT);  //  D4 builtin LED
-
 
   EEPROM.begin(MAX_EEPROM);
   Serial.println("LoadEEPROM Params...");
@@ -814,10 +842,8 @@ uint8_t OffPulse;
   delay(20);
   digitalWrite(OLED_RST, HIGH);
 
-  display.init();
-  if (( ghks.lDisplayOptions & 0x01 ) != 0 ) {  // if bit one on then flip the display
-    display.flipScreenVertically();
-  }
+  setupDisplayInit();
+
   if (( ghks.lDisplayOptions & 0x04 ) != 0 ) {  // use Fast LED
     FastLED.addLeds<NEOPIXEL, PIN_DATA>(leds, NUM_LEDS);  // GRB ordering is assumed
     bNeoPixel = true ;
@@ -825,18 +851,8 @@ uint8_t OffPulse;
   pinMode(button, INPUT_PULLUP);  // set up the button
   
   /* show start screen */
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_CENTER);  
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(63, 0, "Irrigation");
-  display.drawString(63, 16, "Controler");
-  display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);  
-  display.drawString(0, 40, "Copyright (c) 2026");
-  display.drawString(0, 50, "Dougal Plummer");
-  display.setTextAlignment(TEXT_ALIGN_RIGHT);  
-  display.drawString(127, 50, String(Toleo));
-  display.display();
+  setupDisplayScreen();
+
 
   ClearRemoteNodeList();
   
@@ -966,7 +982,7 @@ uint8_t OffPulse;
 //  delay(1000);
 //  Serial.println("Chip ID " + String(chipid, HEX));
 
-  display.setFont(ArialMT_Plain_10);
+
 
 
   Serial.println("Configuring WiFi...");
@@ -995,15 +1011,10 @@ uint8_t OffPulse;
   if (ghks.localPortCtrl == ghks.localPort ){             // bump the NTP port up if they ar the same
     ghks.localPort++ ;
   }
-/*    Serial.println("Starting UDP");
-    ntpudp.begin(ghks.localPort);                      // this is the recieve on NTP port
-    display.drawString(0, 44, "NTP UDP " );
-    display.display();*/
 
     Serial.println("Local UDP port: ");
     ctrludp.begin(ghks.localPortCtrl);                 // recieve on the control port
-//    display.drawString(64, 44, "CTRL UDP " );
-//    display.display();
+
     Serial.println("Control Local UDP port: ");
 //    Serial.println(ctrludp.localPort());
                                                 // end of the normal setup
@@ -1046,8 +1057,12 @@ uint8_t OffPulse;
     Serial.printf("Display Login Page");
   });*/
   server.on("/update", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", updatePage);
+    SendHTTPHeader();
+    server.sendContent(F("<h4><b>ESP32 Firmware Upload</b></h4><br>"));
+    server.sendContent(updatePage);
+    SendHTTPPageFooter();
+//    server.sendHeader("Connection", "close");
+//    server.send(200, "text/html", updatePage);
   });
   server.on("/update", HTTP_POST, []() {   //handling uploading firmware file
     server.sendHeader("Connection", "close");
@@ -1081,7 +1096,7 @@ uint8_t OffPulse;
 
    // Initialize NTP
   if (WiFi.isConnected()){  // Set update every 24 hours
-      configTime(ghks.gmtOffset_sec, ghks.daylightOffset_sec, ghks.timeServer);
+      ConfigureTime();
 
     // Wait for time to be set
     if (!getLocalTime(&timeinfo)) {
@@ -1172,72 +1187,10 @@ uint8_t OffPulse;
 //  Serial.println("ghks as a class " + String(sizeof(ghksc)));
 }
 
-//  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
-void loop() {
-long lTime ;  
-long lRet ;
-int i , j , k  ;
-int x , y ;
-int board ;
-uint8_t OnPol ;
-uint8_t OffPol ;
-int OnPulse ;
-int OffPulse ;
-bool bSendCtrlPacket = false ;
-bool bDirty = false ;
-bool bDirty2 = false ;
-long lTD ;
-
-int iHM = 0 ; 
-int iDOW = 0 ;
-int iRebootTime = 0 ;
-time_t NowTime ;
-time_t MaxTime ;
-int iBusReturn = 0 ;
-//int iLoRaReturn = 0 ;
-
-/*
-  if ( iDisplayCountDown != 0 ){
-    if ( ghks.cpufreq < 240 ){     // use    ghks.cpufreq   ???? faster 
-      setCpuFrequencyMhz(240);
-    }
-  }*/
-  lTime = millis() ;
-  getLocalTime(&timeinfo);
-  server.handleClient();
-/*  if (bLoRa)
-    DoLaRaStuff();*/
-//  SetSelectedSpeed();
-  
-//  magval = hallRead();  // check for magnets near by ( wake up signal but the bare chip doesnt have one ONLY the silver modules )
-  lTime = millis() ;
-  iTestTime = constrain(iTestTime,2,50);
-  iTestMode = constrain(iTestMode,-1,16);
-/*  if (digitalRead(FLASH_BTN) == LOW) { // what to do if the button be pressed
-  }*/
-      
-  lScanCtr++ ;
-//  bSendCtrlPacket = false ;
-  if ( rtc_sec != timeinfo.tm_sec){
+void loopDisplaySecond(){
+  int x = 0 , y = 0 ; 
     display.clear();
     if ( iTestMode != -1 ){                      // board test mode
-      if (eboard[iTestBoard].Type==4)
-        ActivateOutput(iTestBoard,iTestCoil,HIGH,(ghks.lPulseTime % 128 ));  
-      else
-        ActivateOutput(iTestBoard,iTestCoil,LOW,(ghks.lPulseTime % 128 ));  
-      iTestTimer++ ; // count the econd while in test mode
-      if (( iTestTimer % iTestTime ) == ( iTestTime - 1 )){       
-        iTestMode++ ;
-        if ( iTestInc == 1 ) {
-          iTestCoil++ ;    // increment the coil
-          if ( iTestCoil >= MaxBoardOutputs(iTestBoard )){
-            iTestCoil = 0 ;
-          }
-        }
-        if ( iTestMode >= MaxBoardOutputs(iTestBoard )){
-          iTestMode = -1 ; // switch off if we have done all 16 channels
-        }
-      }
       display.setTextAlignment(TEXT_ALIGN_RIGHT);                   // put an indicator up to show we are in this mode
       display.drawString(127 , 30, "Testing " + String(iTestBoard));              
       display.setTextAlignment(TEXT_ALIGN_RIGHT);                   // put an indicator up to show we are in this mode
@@ -1247,8 +1200,6 @@ int iBusReturn = 0 ;
         display.drawString(127 , 41, String(iTestMode));
       }
     }  
-    
-//      display.drawLine(minRow, 63, maxRow, 63);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", timeinfo.tm_year+1900, timeinfo.tm_mon+1, timeinfo.tm_mday , timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     display.drawString(0 , LineText, String(buff) );
@@ -1260,18 +1211,6 @@ int iBusReturn = 0 ;
     }
     
     if ( bBusGood ){
-/*
-      if (bLoRa ){
-        if ( bLoRaGood ){
-        }else{
-          display.drawString(127 , 42, String("-LoRa-"));    
-          if (( rtc_sec % 2 ) == 0 ){
-            display.setColor(INVERSE);
-            display.fillRect(95, 42, 32, 12);
-          }        
-        }
-      }
-      */
     }else{
       display.drawString(127 , 42, String("-BUS-"));    
       if (( rtc_sec % 2 ) == 0 ){
@@ -1281,7 +1220,7 @@ int iBusReturn = 0 ;
     }
     
     display.setTextAlignment(TEXT_ALIGN_CENTER);
-    i = ( rtc_sec >> 1 ) % 10 ;
+    int i = ( rtc_sec >> 1 ) % 10 ;
     switch (i){
       case 1:
         MyIP =  WiFi.localIP() ;  // update to see if has connection                  
@@ -1315,19 +1254,9 @@ int iBusReturn = 0 ;
         }
       break;  
       case 7:
-/*        if ( bLoRa ){
-          if ( bLoRaGood ){
-            snprintf(buff, BUFF_MAX, "LaPa RSSI %d SNR %.1f FE %d",LoRaLastRssi,LoRaLastSnr , LoRaLastFrequencyError );          
-          }else{
-            snprintf(buff, BUFF_MAX, "LoRa %s", strLoRaResults.c_str() );
-          }
-        }else{
-          snprintf(buff, BUFF_MAX, "### LoRa Offline ###" );          
-        }*/
         if ( bMesh ){
           snprintf(buff, BUFF_MAX, "### ESPNow Active ###" );
         }
-        
       break;    
       case 8:
         snprintf(buff, BUFF_MAX, "WiFi Chan %d", gChannel );            
@@ -1351,7 +1280,7 @@ int iBusReturn = 0 ;
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(128 , 43 ,  String("*") );      
       }
-      for ( i = 0 ; i < ADC_MAX_ALARM ; i++ ) {      
+      for (int i = 0 ; i < ADC_MAX_ALARM ; i++ ) {      
         if ( ADC_Trigger[i] > 0 ) {
            display.drawString(128 , 43 , String(iMailMsg) + "-" + String(ADC_Trigger[i]) + " / " + String(adcs.alarm[i].ADC_Delay) );
            display.setColor(INVERSE);
@@ -1359,6 +1288,171 @@ int iBusReturn = 0 ;
         }
       }
     }
+
+    for (int i = 0 ; i < MAX_VALVE ; i++ ) {              // scan all the valves for masters then look for matching subordinates then update TTGS from them if required
+      if ( i < 16 ) {
+        x = i * 8 ;
+        y = 15 ;       
+      }else{
+        x = (i-16) * 8 ;
+        y = 23 ;       
+      }  
+      if ( vvalve[i].bOnOff ){   // valve on       
+        if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){  // look if it has feedback
+          display.drawCircle(x+3, y, 3);
+          display.drawLine(x+1, y - 2, x+5, y + 2);
+          display.drawLine(x+1, y + 2, x+5, y - 2);        
+        }else{
+          display.fillCircle(x+3, y, 3);
+        }  
+      }else{                      // valve off
+        if (( vvalve[i].iFB & 0x01 ) != 0x00  ){   // feedback status as if it is off or not
+          display.drawCircle(x+3, y, 3);
+        }else{  
+          display.drawCircle(x+3, y, 1);
+        }
+      }
+    }                                                        // end first pass of valves
+    for (int i = 0 ; i < MAX_FERT ; i++ ) { 
+      if ( efert[i].CurrentQty > 0 ) {          
+        if ( vfert[i].bRun ){
+          display.fillCircle(i*8+3, 33, 3);
+        }else{
+          display.drawCircle(i*8+3, 33, 1);
+        }      
+      }else{
+          display.drawCircle(i*8+3, 33, 3);    
+      }
+      if ( vfert[i].bOnOff ){
+        display.fillCircle(i*8+3, 41, 3);
+      }else{
+        display.drawCircle(i*8+3, 41, 1);
+      }       
+    }
+    if (( iDisplayCountDown == 0 ) && ( ghks.displaytimer > 0 ) && ((ghks.lDisplayOptions & 0x02 ) != 0 )){
+ //     display.clear();  // turn off all the pixels  ??? required as we never send them out the bus
+    }else{  
+      display.display();
+    }
+}
+
+void loopStatusLEDSecond(){
+    if (bNeoPixel){  
+      if (bTXMeshCtrl){
+        leds[0] = CRGB::Purple ;   //  CRGB(255, 0, 0); 
+        bTXMeshCtrl = false ;
+      }
+      else{
+        if (bTXWiFiCtrl){
+          leds[0] = CRGB::Cyan ;
+          bTXWiFiCtrl = false ; 
+        }
+        else{
+          if (mesh.getRelayBlink()){
+            leds[0] = CRGB::Red ;
+          }
+          else{
+            if (mesh.getRXBlink()){
+              leds[0] = CRGB::Green ;
+            }
+            else{
+              if (WiFi.isConnected())  {
+                if ( leds[0].b != 0 )
+                  leds[0] = CRGB::Black ;
+                else
+                  leds[0] = CRGB::Blue ;
+              }
+              else{
+                if (( rtc_sec % 4 ) != 0 )    {
+                  leds[0] = CRGB::Black ;
+                }else{
+                  leds[0] = CRGB::Blue ;
+                }
+              }
+            }
+          }
+        }
+      }
+      FastLED.show();      
+    }
+    else{
+      if (WiFi.isConnected())  {
+        digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
+      }else{
+        if (( rtc_sec % 4 ) == 0 )    {
+          digitalWrite(ESP32_BUILTIN_LED,true);        
+        }else{
+          digitalWrite(ESP32_BUILTIN_LED,false);                
+        }
+      }
+    }
+}
+//  ##############################  LOOP   #############################  LOOP  ##########################################  LOOP  ###################################
+void loop() {
+long lTime ;  
+long lRet ;
+int i , j , k  ;
+int board ;
+uint8_t OnPol ;
+uint8_t OffPol ;
+int OnPulse ;
+int OffPulse ;
+bool bSendCtrlPacket = false ;
+bool bDirty = false ;
+bool bDirty2 = false ;
+long lTD ;
+
+int iHM = 0 ; 
+int iDOW = 0 ;
+int iRebootTime = 0 ;
+time_t NowTime ;
+time_t MaxTime ;
+int iBusReturn = 0 ;
+//int iLoRaReturn = 0 ;
+
+/*
+  if ( iDisplayCountDown != 0 ){
+    if ( ghks.cpufreq < 240 ){     // use    ghks.cpufreq   ???? faster 
+      setCpuFrequencyMhz(240);
+    }
+  }*/
+  lTime = millis() ;
+  getLocalTime(&timeinfo);
+  server.handleClient();
+
+//  SetSelectedSpeed();
+  
+//  magval = hallRead();  // check for magnets near by ( wake up signal but the bare chip doesnt have one ONLY the silver modules )
+  lTime = millis() ;
+  iTestTime = constrain(iTestTime,2,50);
+  iTestMode = constrain(iTestMode,-1,16);
+/*  if (digitalRead(FLASH_BTN) == LOW) { // what to do if the button be pressed
+  }*/
+      
+  lScanCtr++ ;
+//  bSendCtrlPacket = false ;
+  if ( rtc_sec != timeinfo.tm_sec){
+
+    if ( iTestMode != -1 ){                      // board test mode
+      if (eboard[iTestBoard].Type==4)
+        ActivateOutput(iTestBoard,iTestCoil,HIGH,(ghks.lPulseTime % 128 ));  
+      else
+        ActivateOutput(iTestBoard,iTestCoil,LOW,(ghks.lPulseTime % 128 ));  
+      iTestTimer++ ; // count the econd while in test mode
+      if (( iTestTimer % iTestTime ) == ( iTestTime - 1 )){       
+        iTestMode++ ;
+        if ( iTestInc == 1 ) {
+          iTestCoil++ ;    // increment the coil
+          if ( iTestCoil >= MaxBoardOutputs(iTestBoard )){
+            iTestCoil = 0 ;
+          }
+        }
+        if ( iTestMode >= MaxBoardOutputs(iTestBoard )){
+          iTestMode = -1 ; // switch off if we have done all 16 channels
+        }
+      }
+    }  
+
     MaxTime = now() + 2 ;                                            // PEEK AT THE FUTURE FOR SWITCHING TRANSIENTS 
     if (ghks.lProgMethod == 0 ){
       UpdateATTG(MaxTime) ;                                         
@@ -1429,31 +1523,12 @@ int iBusReturn = 0 ;
           }    
         }
       }      
-      if ( i < 16 ) {
-        x = i * 8 ;
-        y = 15 ;       
-      }else{
-        x = (i-16) * 8 ;
-        y = 23 ;       
-      }  
+
       if ( vvalve[i].bOnOff ){   // valve on
         bValveActiveAny = true ;
         if (( evalve[i].TypeMaster & 0x80 ) != 0x00  ){
           bValveActive = true ;
         }          
-        if (( evalve[i].TypeMaster & 0x40 ) != 0x00  ){  // look if it has feedback
-          display.drawCircle(x+3, y, 3);
-          display.drawLine(x+1, y - 2, x+5, y + 2);
-          display.drawLine(x+1, y + 2, x+5, y - 2);        
-        }else{
-          display.fillCircle(x+3, y, 3);
-        }  
-      }else{                      // valve off
-        if (( vvalve[i].iFB & 0x01 ) != 0x00  ){   // feedback status as if it is off or not
-          display.drawCircle(x+3, y, 3);
-        }else{  
-          display.drawCircle(x+3, y, 1);
-        }
       }
       if ( vvalve[i].lTTC > 0 ){   // decriment the seconds to clear  --- first pass
         vvalve[i].lTTC--;
@@ -1461,29 +1536,13 @@ int iBusReturn = 0 ;
       }
     }                                                        // end first pass of valves
     for (i = 0 ; i < MAX_FERT ; i++ ) { 
-      if ( efert[i].CurrentQty > 0 ) {          
-        if ( vfert[i].bRun ){
-          display.fillCircle(i*8+3, 33, 3);
-        }else{
-          display.drawCircle(i*8+3, 33, 1);
-        }      
-      }else{
-          display.drawCircle(i*8+3, 33, 3);
-//        display.drawLine(i*8+1, 31, i*8+5, 35);
-//        display.drawLine(i*8+1, 35, i*8+5, 31);        
-      }
       if ( vfert[i].bOnOff ){
-        display.fillCircle(i*8+3, 41, 3);
         bDirty = true ;
-      }else{
-        display.drawCircle(i*8+3, 41, 1);
-      }       
+      }      
     }
-    if (( iDisplayCountDown == 0 ) && ( ghks.displaytimer > 0 ) && ((ghks.lDisplayOptions & 0x02 ) != 0 )){
- //     display.clear();  // turn off all the pixels  ??? required as we never send them out the bus
-    }else{  
-      display.display();
-    }
+    
+    loopDisplaySecond();
+
     for (i = 0 ; i < MAX_VALVE ; i++ ) {
       if ( bDirty ) {
         vvalve[i].lTTC = evalve[i].lTTC ;                                          // if dirty then start all the timers again
@@ -1563,56 +1622,7 @@ int iBusReturn = 0 ;
       }
     }
     
-    
-    if (bNeoPixel){  
-      if (bTXMeshCtrl){
-        leds[0] = CRGB::Purple ;   //  CRGB(255, 0, 0); 
-        bTXMeshCtrl = false ;
-      }
-      else{
-        if (bTXWiFiCtrl){
-          leds[0] = CRGB::Cyan ;
-          bTXWiFiCtrl = false ; 
-        }
-        else{
-          if (mesh.getRelayBlink()){
-            leds[0] = CRGB::Red ;
-          }
-          else{
-            if (mesh.getRXBlink()){
-              leds[0] = CRGB::Green ;
-            }
-            else{
-              if (WiFi.isConnected())  {
-                if ( leds[0].b != 0 )
-                  leds[0] = CRGB::Black ;
-                else
-                  leds[0] = CRGB::Blue ;
-              }
-              else{
-                if (( rtc_sec % 4 ) != 0 )    {
-                  leds[0] = CRGB::Black ;
-                }else{
-                  leds[0] = CRGB::Blue ;
-                }
-              }
-            }
-          }
-        }
-      }
-      FastLED.show();      
-    }
-    else{
-      if (WiFi.isConnected())  {
-        digitalWrite(ESP32_BUILTIN_LED,!digitalRead(ESP32_BUILTIN_LED));
-      }else{
-        if (( rtc_sec % 4 ) == 0 )    {
-          digitalWrite(ESP32_BUILTIN_LED,true);        
-        }else{
-          digitalWrite(ESP32_BUILTIN_LED,false);                
-        }
-      }
-    }
+    loopStatusLEDSecond();
 
     rtc_sec = timeinfo.tm_sec ;
     lScanLast = lScanCtr ;
@@ -2044,4 +2054,3 @@ void breakTime(time_t t, tmElements_t &tm) {
     tm.Year   = timeinfo.tm_year + 1900 - 1970;
     tm.Wday   = timeinfo.tm_wday + 1;  // TimeLib uses 1-7, Sunday = 1
 }
-

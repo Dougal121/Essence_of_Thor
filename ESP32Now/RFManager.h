@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <ESPmDNS.h>
 
 class EspNowMesh;  // forward declare
 
@@ -49,7 +50,7 @@ public:
     void onDiscoverReply(uint32_t gatewayId, uint8_t channel);
     void onReceive(const uint8_t* data, int len);
     void attachMesh(EspNowMesh* mesh);
-
+    void StartMDNS(const char *hostName);
 private:
 
     void setChannel(uint8_t ch);
@@ -90,6 +91,7 @@ private:
     uint32_t _discoverStart = 0;
 
     bool _apEnabled = false;
+    bool _mdnsStarted = false ;
     uint32_t _apTimeout = 0;
 
     char _ssid[32];

@@ -289,7 +289,7 @@ void EspNowMesh::sendTimeSync() {
   alreadySeen(pkt.msg_id);
   mesh_packet_t::prepareForSend(pkt);
   esp_now_send(ESP_BROADCAST, (uint8_t*)&pkt, sizeof(pkt));
-  Serial.println("EspNowMesh::sendHeartbeat ");
+  Serial.println("EspNowMesh::sendTimeSync ");
 }
 
 void EspNowMesh::sendAck(const mesh_packet_t &rx) {

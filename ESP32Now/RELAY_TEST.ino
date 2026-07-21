@@ -272,31 +272,37 @@ void handleSTime(){
   byte mac[6];
 //  tmElements_t tm;
   time_t nowTime ; //= time(NULL);      
-  struct tm t = {};
+  struct tm tm = {};
 
   SerialOutParams();
   
   for (uint8_t j=0; j<server.args(); j++){
     i = String(server.argName(j)).indexOf("stime");
     if (i != -1){  // 
-      t.tm_year = String(server.arg(j)).substring(0,4).toInt()-1900 ;  /// was 1970
-      t.tm_mon = String(server.arg(j)).substring(5,7).toInt()-1 ;
-      t.tm_mday = String(server.arg(j)).substring(8,10).toInt() ;
-      t.tm_hour = String(server.arg(j)).substring(11,13).toInt() ;
-      t.tm_min = String(server.arg(j)).substring(14,16).toInt() ;
-      t.tm_sec = 0 ;
+      tm.tm_year = String(server.arg(j)).substring(0,4).toInt()-1900 ;  /// was 1970
+      tm.tm_mon = String(server.arg(j)).substring(5,7).toInt()-1 ;
+      tm.tm_mday = String(server.arg(j)).substring(8,10).toInt() ;
+      tm.tm_hour = String(server.arg(j)).substring(11,13).toInt() ;
+      tm.tm_min = String(server.arg(j)).substring(14,16).toInt() ;
+      tm.tm_sec = 0 ;
 
-      setTime(t.tm_hour,t.tm_min,t.tm_sec,t.tm_mday,t.tm_mon,t.tm_year);    
+      time_t t = mktime(&tm);
+
+      struct timeval tv;
+      tv.tv_sec = t;
+      tv.tv_usec = 0;
+      settimeofday(&tv, nullptr);
+//      setTime(t.tm_hour,t.tm_min,t.tm_sec,t.tm_mday,t.tm_mon,t.tm_year);    this is OLD
       time_t currentTime;
       time(&currentTime);             
       if ( hasRTC ){
-        tc.sec = t.tm_sec;     
-        tc.min = t.tm_min;     
-        tc.hour = t.tm_hour;   
+        tc.sec = tm.tm_sec;     
+        tc.min = tm.tm_min;     
+        tc.hour = tm.tm_hour;   
         tc.wday = dayOfWeek(currentTime);            
-        tc.mday = t.tm_mday;  
-        tc.mon = t.tm_mon;   
-        tc.year = t.tm_year;    
+        tc.mday = tm.tm_mday;  
+        tc.mon = tm.tm_mon;   
+        tc.year = tm.tm_year;    
         DS3231_set(tc);                       // set the RTC as well
         rtc_status = DS3231_get_sreg();       // get the status
         DS3231_set_sreg(rtc_status & 0x7f ) ; // clear the clock fail bit when you set the time
@@ -306,7 +312,9 @@ void handleSTime(){
   }
   
   SendHTTPHeader();
-  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d", t.tm_year+1900, t.tm_mon+1, t.tm_mday , t.tm_hour, t.tm_min);
+  getLocalTime(&timeinfo);   // declared in main var list of program
+  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d:%02d", timeinfo.tm_year+1900, timeinfo.tm_mon+1, timeinfo.tm_mday , timeinfo.tm_hour, timeinfo.tm_min);
+//  snprintf(buff, BUFF_MAX, "%d/%02d/%02d %02d:%02d", currentTime.tm_year+1900, t.tm_mon+1, t.tm_mday , t.tm_hour, t.tm_min);
   server.sendContent("<br><br><form method=post action=" + server.uri() + "><br>Set Current Time: <input type='text' name='stime' value='"+ String(buff) + "' size=12>");
   server.sendContent(F("<input type='submit' value='SET'><br><br></form>"));
   
