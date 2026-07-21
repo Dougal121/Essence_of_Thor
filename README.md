@@ -34,6 +34,8 @@ LocalCPU I/O<br>
 26/02/2023 ESP332 version going on 915MHz TTGO LoRa Board.<br>
 04/03/2023        Put CRC 16 on control packets and sort of upto range testing the LoRa under real world conditions.<br>
 18/03/2023        It the weekend and I dont have a life so lost of small fixes and the start of moisture monitoring
-<br>
+<br><br>
 <b>2026-2027 Irrigation season</b><br>
-09/07/2026        Forked this off and upgraded to ESP32 Core 3.X  and ESPNow netorking in favour of the LoRa ... see ESPNow folder
+09/07/2026        Forked this off and upgraded to ESP32 Core 3.X  and ESPNow netorking in favour of the LoRa ... see ESPNow folder<br>
+10/07/2026        More I/O support for RS-485 RTU and  HC595 shift resgister driven relay boards<br>
+
