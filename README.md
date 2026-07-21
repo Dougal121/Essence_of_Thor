@@ -3,7 +3,7 @@ Open Source Irrigation Controller Circa 2019<br>
 
 This code is designed for the ESP platform<br>
 First versions running on the ESP8266 <br>
-Compiled in the arduino IDE and trageting LOLIN (WeMos) ESP8266/ESP32 compatible bopards.<br>
+Compiled in the arduino IDE and trageting LOLIN (WeMos) ESP8266/ESP32 compatible boards.<br>
 
 More details on construction
 https://www.hackster.io/dougal/essence-of-thor-part-1-4a83a1<br>
